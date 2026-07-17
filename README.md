@@ -2,6 +2,19 @@
 
 Sistema para acompanhamento do funil de rematrícula de alunos, com pipeline estilo Kanban. React + TypeScript + Supabase.
 
+## 🎨 Identidade visual (atualização)
+
+O visual foi atualizado para seguir a identidade da Uniasselvi, mantendo 100% das telas, rotas e nomenclaturas que já funcionavam.
+
+**O que mudou:**
+- `src/index.css` — os tokens de cor (`--primary`, `--secondary`, etc.) foram trocados para a paleta da marca: teal `#00A9AA` (cor principal, usada em botões, links, foco de campos, coluna do kanban), amarelo `#FFD600` (destaque secundário) e cinza-escuro `#282828` (navegação).
+- `src/utils/formatters.ts` — as cores de cada etapa do pipeline (`getStatusColor`) e das tags de tipo de aluno (`getTipoAlunoColor`) foram ajustadas pra essa mesma paleta, mantendo o vermelho só para "Desistente" (sinal de alerta, mais fácil de bater o olho e identificar rápido do que um tom escuro que se mistura com o texto).
+- `src/components/Layout.tsx` e `Layout.css` — a antiga sidebar branca com texto foi substituída por uma **topbar escura** (logo, usuário logado, botão de sair) + um **rail de ícones** estreito à esquerda (Pipeline, Alunos), com tooltip ao passar o mouse. No celular, o rail vira um menu deslizante (mesma lógica de antes, só com aparência nova).
+
+**O que não mudou:** nenhuma rota, nenhuma chamada ao Supabase, nenhum texto/rótulo das páginas (Dashboard, Alunos, formulários), nenhuma regra de negócio. Só a "casca" visual do app e a paleta de cores.
+
+Validado com `npm install` → `eslint` → `tsc -b` → `vite build`, tudo sem erro.
+
 ## 🚀 Funcionalidades
 
 - ✅ Autenticação real via Supabase Auth

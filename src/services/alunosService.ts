@@ -281,18 +281,24 @@ export async function deleteAluno(id: string): Promise<{ error: string | null }>
  * RLS garante que colaborador só consegue apagar o que é dele mesmo
  * passando vários ids aqui.
  */
-export async function deleteAlunosBulk(ids: string[]): Promise<{ error: string | null }> {
+export async function deleteAlunosBulk(
+  ids: string[]
+): Promise<{ error: string | null; deletedCount: number }> {
   try {
-    const { error } = await supabase.from('alunos').delete().in('id', ids);
+    const { data, error } = await supabase
+      .from('alunos')
+      .delete()
+      .in('id', ids)
+      .select('id'); // força avaliação row-a-row e retorna o que foi deletado
 
     if (error) {
       console.error('Error bulk deleting alunos:', error);
-      return { error: error.message };
+      return { error: error.message, deletedCount: 0 };
     }
 
-    return { error: null };
+    return { error: null, deletedCount: data?.length ?? 0 };
   } catch {
-    return { error: 'Erro ao excluir alunos selecionados' };
+    return { error: 'Erro ao excluir alunos selecionados', deletedCount: 0 };
   }
 }
 

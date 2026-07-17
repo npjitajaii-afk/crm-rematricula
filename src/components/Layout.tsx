@@ -1,114 +1,144 @@
 import React, { useState } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { Home, Users, LogOut, Menu, X, User, Briefcase, UsersRound } from "lucide-react";
+import { useAlunos } from "../hooks/useAlunos";
+import {
+  LayoutDashboard,
+  Users,
+  BarChart2,
+  LogOut,
+  Menu,
+  X,
+  User,
+  Send,
+} from "lucide-react";
+import NotificacoesSininho from "./NotificacoesSininho";
+import ModalRecado from "./ModalRecado";
 import "./Layout.css";
 
 const Layout: React.FC = () => {
   const { user, logout } = useAuth();
+  const { isAdmin, colaboradores } = useAlunos();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRailOpen, setIsRailOpen] = useState(false);
+  const [showRecado, setShowRecado] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  const isAdmin = user?.role === "admin";
-  const isColaborador = user?.role === "colaborador";
-
+  // Mesmos itens de navegação de sempre — só a apresentação visual mudou
+  // (de lista com texto para ícones com tooltip, como no rail escuro).
   const menuItems = [
-    { path: "/dashboard", icon: Home, label: "Início" },
-    ...(isColaborador
-      ? [{ path: "/minha-area", icon: Briefcase, label: "Minha Área" }]
-      : []),
-    { path: "/alunos", icon: Users, label: "Geral" },
-    ...(isAdmin
-      ? [{ path: "/colaboradores", icon: UsersRound, label: "Colaboradores" }]
-      : []),
+    { path: "/dashboard", icon: LayoutDashboard, label: "Pipeline" },
+    { path: "/alunos", icon: Users, label: "Alunos" },
+    { path: "/metricas", icon: BarChart2, label: "Métricas" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
     <div className="layout">
-      <aside className={`sidebar ${isSidebarOpen ? "open" : ""}`}>
-        <div className="sidebar-header">
-          <div className="logo">
-            <Home size={28} />
-            <span>CRM Rematrícula</span>
-          </div>
-          <button
-            className="sidebar-close"
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <X size={24} />
-          </button>
+      <header className="topbar">
+        <button
+          className="rail-toggle"
+          onClick={() => setIsRailOpen(!isRailOpen)}
+          aria-label="Abrir menu"
+        >
+          <Menu size={22} />
+        </button>
+
+        <div className="topbar-logo">
+          <LayoutDashboard size={22} />
+          <span>CRM Rematrícula</span>
         </div>
 
-        <nav className="sidebar-nav">
-          {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`nav-item ${isActive(item.path) ? "active" : ""}`}
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              <item.icon size={20} />
-              <span>{item.label}</span>
-            </Link>
-          ))}
-        </nav>
+        <div className="topbar-spacer" />
 
-        <div className="sidebar-footer">
-          <div className="user-info">
-            <div className="user-avatar">
-              <User size={20} />
+        <div className="topbar-actions">
+          {isAdmin && (
+            <button
+              className="topbar-icon-btn"
+              onClick={() => setShowRecado(true)}
+              title="Enviar recado"
+              aria-label="Enviar recado"
+            >
+              <Send size={18} />
+            </button>
+          )}
+
+          <NotificacoesSininho />
+
+          <div className="topbar-user">
+            <div className="user-avatar-small">
+              <User size={16} />
             </div>
-            <div className="user-details">
-              <p className="user-name">{user?.name}</p>
-              <p className="user-email">{user?.email}</p>
-              <p className="user-role-badge">{isAdmin ? "Admin" : "Colaborador"}</p>
+            <div className="topbar-user-text">
+              <span className="user-name-header">{user?.name}</span>
+              <span className="user-email-header">{user?.email}</span>
             </div>
           </div>
+
           <button
-            className="btn btn-danger btn-sm w-full"
+            className="topbar-logout"
             onClick={handleLogout}
+            title="Sair"
+            aria-label="Sair"
           >
             <LogOut size={18} />
-            Sair
           </button>
         </div>
-      </aside>
+      </header>
 
-      <div className="main-content">
-        <header className="header">
+      {showRecado && (
+        <ModalRecado
+          onClose={() => setShowRecado(false)}
+          colaboradores={colaboradores}
+        />
+      )}
+
+      <div className="body-row">
+        <aside className={`rail ${isRailOpen ? "open" : ""}`}>
           <button
-            className="menu-button"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="rail-close"
+            onClick={() => setIsRailOpen(false)}
+            aria-label="Fechar menu"
           >
-            <Menu size={24} />
+            <X size={18} />
           </button>
 
-          <div className="header-user">
-            <div className="user-avatar-small">
-              <User size={18} />
-            </div>
-            <span className="user-name-header">{user?.name}</span>
-          </div>
-        </header>
+          <nav className="rail-nav">
+            {menuItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`rail-btn ${isActive(item.path) ? "active" : ""}`}
+                onClick={() => setIsRailOpen(false)}
+              >
+                <item.icon size={20} />
+                <span className="rail-label">{item.label}</span>
+                <span className="rail-tip">{item.label}</span>
+              </Link>
+            ))}
+          </nav>
+
+          <div className="rail-spacer" />
+
+          <button className="rail-btn rail-logout-mobile" onClick={handleLogout}>
+            <LogOut size={20} />
+            <span className="rail-label">Sair</span>
+          </button>
+        </aside>
 
         <main className="content">
           <Outlet />
         </main>
       </div>
 
-      {isSidebarOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={() => setIsSidebarOpen(false)}
-        />
+      {isRailOpen && (
+        <div className="rail-overlay" onClick={() => setIsRailOpen(false)} />
       )}
     </div>
   );

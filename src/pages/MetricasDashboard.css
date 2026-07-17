@@ -1,0 +1,217 @@
+.metricas {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.metricas-header {
+  margin-bottom: 1.5rem;
+}
+
+.metricas-header h1 {
+  font-size: 1.5rem;
+  color: var(--ink);
+}
+
+.metricas-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.metricas-loading,
+.metricas-empty {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  padding: 1rem 0;
+}
+
+/* ---- KPI cards ---- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.kpi-card {
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.kpi-card-alert {
+  border: 1px solid var(--warning);
+  background-color: #fffbeb;
+}
+
+.kpi-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kpi-icon-primary {
+  background-color: rgba(0, 169, 170, 0.12);
+  color: var(--primary);
+}
+
+.kpi-icon-success {
+  background-color: rgba(34, 197, 94, 0.12);
+  color: var(--success);
+}
+
+.kpi-icon-secondary {
+  background-color: rgba(224, 180, 0, 0.15);
+  color: var(--secondary-dark);
+}
+
+.kpi-icon-warning {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+}
+
+.kpi-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.kpi-value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.kpi-value-suffix {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--success);
+}
+
+/* ---- Sections ---- */
+.metricas-section {
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.metricas-section h2 {
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin-bottom: 1rem;
+}
+
+/* ---- Pipeline bars ---- */
+.pipeline-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pipeline-row {
+  display: grid;
+  grid-template-columns: 170px 1fr 40px;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pipeline-label {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.pipeline-bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background-color: var(--gray-100);
+  overflow: hidden;
+}
+
+.pipeline-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease-in-out;
+}
+
+.pipeline-count {
+  text-align: right;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* ---- Tables ---- */
+.metricas-table-wrapper {
+  overflow-x: auto;
+}
+
+.metricas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.metricas-table th {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--gray-200);
+  white-space: nowrap;
+}
+
+.metricas-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--gray-100);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.metricas-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.taxa-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background-color: rgba(0, 169, 170, 0.12);
+  color: var(--primary-dark);
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .pipeline-row {
+    grid-template-columns: 110px 1fr 34px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+}

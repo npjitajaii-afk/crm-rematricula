@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
+import { useConfirm } from "../hooks/useConfirm";
 import { useNavigate } from "react-router-dom";
 import { AlunoStatus, CanalContato } from "../types";
 import {
@@ -39,6 +41,8 @@ const Alunos: React.FC = () => {
     isAdmin,
   } = useAlunos();
   const { user } = useAuth();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState(filters.search || "");
@@ -149,12 +153,13 @@ const Alunos: React.FC = () => {
       await importAlunos(file, (done, total) => {
         setImportProgress({ done, total });
       });
-      alert("Alunos importados com sucesso!");
+      showToast("Alunos importados com sucesso!", "success");
     } catch (err) {
-      alert(
+      showToast(
         err instanceof Error
           ? err.message
-          : "Erro ao importar alunos. Verifique o formato do arquivo."
+          : "Erro ao importar alunos. Verifique o formato do arquivo.",
+        "error"
       );
     } finally {
       setImportProgress(null);
@@ -162,14 +167,17 @@ const Alunos: React.FC = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o aluno "${name}"?`)) {
-      return;
-    }
+    const confirmed = await confirm(
+      `Tem certeza que deseja excluir o aluno "${name}"?`,
+      { confirmLabel: "Excluir" }
+    );
+    if (!confirmed) return;
 
     try {
       await deleteAluno(id);
+      showToast("Aluno excluído com sucesso!", "success");
     } catch {
-      alert("Erro ao excluir aluno. Tente novamente.");
+      showToast("Erro ao excluir aluno. Tente novamente.", "error");
     }
   };
 
@@ -177,7 +185,7 @@ const Alunos: React.FC = () => {
     try {
       await assumirAluno(id);
     } catch {
-      alert("Erro ao assumir contato. Tente novamente.");
+      showToast("Erro ao assumir contato. Tente novamente.", "error");
     }
   };
 
@@ -196,19 +204,26 @@ const Alunos: React.FC = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (
-      !window.confirm(
-        `Tem certeza que deseja excluir ${selectedIds.length} aluno(s) selecionado(s)? Essa ação não pode ser desfeita.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm(
+      `Tem certeza que deseja excluir ${selectedIds.length} aluno(s) selecionado(s)? Essa ação não pode ser desfeita.`,
+      { confirmLabel: "Excluir todos" }
+    );
+    if (!confirmed) return;
 
     try {
-      await deleteAlunosBulk(selectedIds);
+      const deletedCount = await deleteAlunosBulk(selectedIds);
       setSelectedIds([]);
+
+      if (deletedCount < selectedIds.length) {
+        showToast(
+          `${deletedCount} de ${selectedIds.length} aluno(s) excluído(s). Alguns não puderam ser removidos (verifique suas permissões).`,
+          deletedCount > 0 ? "info" : "error"
+        );
+      } else {
+        showToast(`${deletedCount} aluno(s) excluído(s) com sucesso.`, "success");
+      }
     } catch {
-      alert("Erro ao excluir alunos selecionados. Tente novamente.");
+      showToast("Erro ao excluir alunos selecionados. Tente novamente.", "error");
     }
   };
 

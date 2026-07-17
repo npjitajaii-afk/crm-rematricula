@@ -1,7 +1,8 @@
-import React, { useState, useEffect, ReactNode } from "react";
+import React, { useState, useEffect, useMemo, ReactNode } from "react";
 import { Aluno, AlunoFilters, Interacao, PipelineStatusResumo } from "../types";
 import {
   getAlunos,
+  getAlunoById,
   createAluno,
   createAlunosBulk,
   updateAluno as updateAlunoService,
@@ -14,7 +15,6 @@ import {
   addInteraction as addInteractionService,
 } from "../services/alunosService";
 import { useAuth } from "../hooks/useAuth";
-import * as XLSX from "xlsx";
 import { AlunosContext } from "./alunos-context";
 
 interface AlunosProviderProps {
@@ -126,9 +126,9 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   };
 
   const deleteAlunosBulk = async (ids: string[]) => {
-    if (ids.length === 0) return;
+    if (ids.length === 0) return 0;
 
-    const { error } = await deleteAlunosBulkService(ids);
+    const { error, deletedCount } = await deleteAlunosBulkService(ids);
 
     if (error) {
       console.error("Erro ao deletar alunos em massa:", error);
@@ -136,6 +136,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     }
 
     setAlunos((prev) => prev.filter((aluno) => !ids.includes(aluno.id)));
+    return deletedCount;
   };
 
   const assumirAluno = async (id: string) => {
@@ -166,6 +167,9 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     }
   };
 
+  // Otimização 5.3: em vez de recarregar TODOS os alunos após adicionar
+  // uma interação, buscamos apenas o aluno afetado e atualizamos ele
+  // localmente na lista.
   const addInteraction = async (
     alunoId: string,
     interaction: Omit<Interacao, "id" | "alunoId">
@@ -184,9 +188,11 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       throw new Error(error);
     }
 
-    const { alunos: updatedAlunos } = await getAlunos();
-    if (updatedAlunos) {
-      setAlunos(updatedAlunos);
+    const { aluno: updatedAluno } = await getAlunoById(alunoId);
+    if (updatedAluno) {
+      setAlunos((prev) =>
+        prev.map((a) => (a.id === alunoId ? updatedAluno : a))
+      );
     }
   };
 
@@ -194,43 +200,47 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     return alunos.find((aluno) => aluno.id === id);
   };
 
-  const filteredAlunos = alunos.filter((aluno) => {
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      const matchesSearch =
-        aluno.name.toLowerCase().includes(searchLower) ||
-        aluno.email.toLowerCase().includes(searchLower) ||
-        aluno.curso?.toLowerCase().includes(searchLower) ||
-        aluno.ra?.toLowerCase().includes(searchLower) ||
-        aluno.phone.includes(filters.search);
+  // Otimização 5.2: useMemo evita recalcular o filtro em todo re-render,
+  // só refaz o filtro quando `alunos` ou `filters` realmente mudam.
+  const filteredAlunos = useMemo(() => {
+    return alunos.filter((aluno) => {
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesSearch =
+          aluno.name.toLowerCase().includes(searchLower) ||
+          aluno.email.toLowerCase().includes(searchLower) ||
+          aluno.curso?.toLowerCase().includes(searchLower) ||
+          aluno.ra?.toLowerCase().includes(searchLower) ||
+          aluno.phone.includes(filters.search);
 
-      if (!matchesSearch) return false;
-    }
+        if (!matchesSearch) return false;
+      }
 
-    if (filters.status && filters.status.length > 0) {
-      if (!filters.status.includes(aluno.status)) return false;
-    }
+      if (filters.status && filters.status.length > 0) {
+        if (!filters.status.includes(aluno.status)) return false;
+      }
 
-    if (filters.source && filters.source.length > 0) {
-      if (!filters.source.includes(aluno.source)) return false;
-    }
+      if (filters.source && filters.source.length > 0) {
+        if (!filters.source.includes(aluno.source)) return false;
+      }
 
-    if (filters.dateFrom) {
-      if (new Date(aluno.createdAt) < new Date(filters.dateFrom)) return false;
-    }
+      if (filters.dateFrom) {
+        if (new Date(aluno.createdAt) < new Date(filters.dateFrom)) return false;
+      }
 
-    if (filters.dateTo) {
-      const dateTo = new Date(filters.dateTo);
-      dateTo.setHours(23, 59, 59, 999);
-      if (new Date(aluno.createdAt) > dateTo) return false;
-    }
+      if (filters.dateTo) {
+        const dateTo = new Date(filters.dateTo);
+        dateTo.setHours(23, 59, 59, 999);
+        if (new Date(aluno.createdAt) > dateTo) return false;
+      }
 
-    if (filters.assignedTo) {
-      if (aluno.assignedTo !== filters.assignedTo) return false;
-    }
+      if (filters.assignedTo) {
+        if (aluno.assignedTo !== filters.assignedTo) return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
+  }, [alunos, filters]);
 
   /**
    * Normaliza as chaves de uma linha da planilha (remove acentos, espaços e
@@ -323,6 +333,9 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     };
   };
 
+  // Otimização 5.1: import dinâmico do xlsx dentro de importAlunos.
+  // A lib é carregada só quando o usuário realmente importa um arquivo,
+  // reduzindo o bundle inicial em ~1.2 MB.
   const importAlunos = async (
     file: File,
     onProgress?: (done: number, total: number) => void
@@ -332,9 +345,10 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     const jsonData: unknown[] = await new Promise((resolve, reject) => {
       const reader = new FileReader();
 
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const data = e.target?.result;
+          const XLSX = await import("xlsx");
           const workbook = XLSX.read(data, { type: "binary" });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
@@ -395,7 +409,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     }
   };
 
-  const exportAlunos = () => {
+  // Otimização 5.1: também usa import dinâmico do xlsx na exportação.
+  const exportAlunos = async (): Promise<void> => {
     const dataToExport = filteredAlunos.map((aluno) => ({
       Nome: aluno.name,
       Email: aluno.email,
@@ -410,6 +425,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       Observações: aluno.observations || "",
     }));
 
+    const XLSX = await import("xlsx");
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Alunos");
@@ -446,4 +462,3 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     </AlunosContext.Provider>
   );
 };
-

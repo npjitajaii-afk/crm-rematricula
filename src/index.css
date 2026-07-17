@@ -1,12 +1,17 @@
 :root {
-  /* Cores principais */
+  /* Cores da marca (Uniasselvi) */
   --primary: #00A9AA;
-  --primary-dark: #008080;
-  --primary-light: #33BFBF;
-  
+  --primary-dark: #067A7B;
+  --primary-light: #4DBDBD;
+
   --secondary: #FFD600;
-  --success: #00A9AA;
-  --warning: #f59e0b;
+  --secondary-dark: #E0B400;
+
+  --ink: #282828;
+  --ink-light: #454545;
+
+  --success: #22c55e;
+  --warning: #FFD600;
   --danger: #ef4444;
   --info: #00A9AA;
   
@@ -226,7 +231,7 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 169, 170, 0.15);
 }
 
 input:disabled, textarea:disabled, select:disabled {

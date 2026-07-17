@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
+import { useConfirm } from "../hooks/useConfirm";
 import { AlunoStatus } from "../types";
 import {
   ArrowLeft,
@@ -33,6 +35,8 @@ const AlunoDetails: React.FC = () => {
   const navigate = useNavigate();
   const { getAluno, addInteraction, updateAluno, deleteAluno, assumirAluno, delegarAluno, isAdmin, colaboradores } = useAlunos();
   const { user } = useAuth();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [aluno, setAluno] = useState(getAluno(id!));
   const [showInteractionForm, setShowInteractionForm] = useState(false);
@@ -87,7 +91,7 @@ const AlunoDetails: React.FC = () => {
       if (updatedAluno) setAluno(updatedAluno);
     } catch (error) {
       console.error("Erro ao adicionar interação:", error);
-      alert("Erro ao adicionar interação. Tente novamente.");
+      showToast("Erro ao adicionar interação. Tente novamente.", "error");
     }
   };
 
@@ -99,7 +103,7 @@ const AlunoDetails: React.FC = () => {
       if (updatedAluno) setAluno(updatedAluno);
     } catch (error) {
       console.error("Erro ao atualizar status:", error);
-      alert("Erro ao atualizar status. Tente novamente.");
+      showToast("Erro ao atualizar status. Tente novamente.", "error");
     }
   };
 
@@ -108,19 +112,19 @@ const AlunoDetails: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (
-      !window.confirm(`Tem certeza que deseja excluir o aluno "${aluno.name}"?`)
-    ) {
-      return;
-    }
+    const confirmed = await confirm(
+      `Tem certeza que deseja excluir o aluno "${aluno.name}"?`,
+      { confirmLabel: "Excluir" }
+    );
+    if (!confirmed) return;
 
     try {
       await deleteAluno(aluno.id);
-      alert("Aluno excluído com sucesso!");
+      showToast("Aluno excluído com sucesso!", "success");
       navigate("/dashboard");
     } catch (error) {
       console.error("Erro ao excluir aluno:", error);
-      alert("Erro ao excluir aluno. Tente novamente.");
+      showToast("Erro ao excluir aluno. Tente novamente.", "error");
     }
   };
 
@@ -135,7 +139,7 @@ const AlunoDetails: React.FC = () => {
       if (updatedAluno) setAluno(updatedAluno);
     } catch (error) {
       console.error("Erro ao assumir contato:", error);
-      alert("Erro ao assumir contato. Tente novamente.");
+      showToast("Erro ao assumir contato. Tente novamente.", "error");
     }
   };
 
@@ -147,7 +151,7 @@ const AlunoDetails: React.FC = () => {
       if (updatedAluno) setAluno(updatedAluno);
     } catch (error) {
       console.error("Erro ao delegar contato:", error);
-      alert("Erro ao delegar contato. Tente novamente.");
+      showToast("Erro ao delegar contato. Tente novamente.", "error");
     }
   };
 

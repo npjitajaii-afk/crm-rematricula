@@ -8,6 +8,7 @@ import {
 } from "../../utils/formatters";
 import { useNavigate } from "react-router-dom";
 import { useAlunos } from "../../hooks/useAlunos";
+import { useToast } from "../../hooks/useToast";
 import "./AlunoCard.css";
 
 interface AlunoCardProps {
@@ -17,6 +18,7 @@ interface AlunoCardProps {
 const AlunoCard: React.FC<AlunoCardProps> = ({ aluno }) => {
   const navigate = useNavigate();
   const { isAdmin, assumirAluno } = useAlunos();
+  const { showToast } = useToast();
 
   const handleClick = () => {
     navigate(`/alunos/${aluno.id}`);
@@ -27,7 +29,7 @@ const AlunoCard: React.FC<AlunoCardProps> = ({ aluno }) => {
     try {
       await assumirAluno(aluno.id);
     } catch {
-      alert("Erro ao assumir contato. Tente novamente.");
+      showToast("Erro ao assumir contato. Tente novamente.", "error");
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
 import { AlunoStatus, CanalContato } from "../types";
 import { ArrowLeft, Save } from "lucide-react";
 import "./AlunoForm.css";
@@ -11,6 +12,7 @@ const AlunoForm: React.FC = () => {
   const navigate = useNavigate();
   const { getAluno, addAluno, updateAluno } = useAlunos();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const isEditing = !!id;
 
   const existingAluno = isEditing ? getAluno(id!) : null;
@@ -34,10 +36,10 @@ const AlunoForm: React.FC = () => {
 
   useEffect(() => {
     if (isEditing && !existingAluno) {
-      alert("Aluno não encontrado!");
+      showToast("Aluno não encontrado!", "error");
       navigate("/alunos");
     }
-  }, [isEditing, existingAluno, navigate]);
+  }, [isEditing, existingAluno, navigate, showToast]);
 
   const statuses: { value: AlunoStatus; label: string }[] = [
     { value: "pendente", label: "Pendente de Contato" },
@@ -123,19 +125,19 @@ const AlunoForm: React.FC = () => {
 
       if (isEditing) {
         await updateAluno(id!, alunoData);
-        alert("Aluno atualizado com sucesso!");
+        showToast("Aluno atualizado com sucesso!", "success");
         navigate(`/alunos/${id}`);
       } else {
         await addAluno({
           ...alunoData,
           createdBy: user.id,
         });
-        alert("Aluno criado com sucesso!");
+        showToast("Aluno criado com sucesso!", "success");
         navigate("/alunos");
       }
     } catch (error) {
       console.error("Erro ao salvar aluno:", error);
-      alert("Erro ao salvar aluno. Tente novamente.");
+      showToast("Erro ao salvar aluno. Tente novamente.", "error");
     } finally {
       setIsSubmitting(false);
     }

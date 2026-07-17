@@ -1,6 +1,7 @@
 import React from "react";
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { useAlunos } from "../../hooks/useAlunos";
+import { useToast } from "../../hooks/useToast";
 import { AlunoStatus } from "../../types";
 import { getStatusColor } from "../../utils/formatters";
 import KanbanColumn from "./KanbanColumn";
@@ -8,6 +9,7 @@ import "./KanbanBoard.css";
 
 const KanbanBoard: React.FC = () => {
   const { filteredAlunos, updateAluno, statusResumo, isAdmin } = useAlunos();
+  const { showToast } = useToast();
 
   const statuses: AlunoStatus[] = [
     "pendente",
@@ -44,7 +46,7 @@ const KanbanBoard: React.FC = () => {
       await updateAluno(draggableId, { status: newStatus });
     } catch (error) {
       console.error("Erro ao atualizar status do aluno:", error);
-      alert("Erro ao mover aluno. Tente novamente.");
+      showToast("Erro ao mover aluno. Tente novamente.", "error");
     }
   };
 

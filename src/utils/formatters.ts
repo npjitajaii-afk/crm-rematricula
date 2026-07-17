@@ -64,12 +64,12 @@ export const validatePhone = (phone: string): boolean => {
 
 export const getStatusColor = (status: string): string => {
   const colors: Record<string, string> = {
-    'pendente': '#00A9AA',
-    'contatado': '#FFD600',
-    'aguardando_retorno': '#f97316',
+    'pendente': '#9CA3AF',
+    'contatado': '#4DBDBD',
+    'aguardando_retorno': '#FFD600',
     'confirmado': '#00A9AA',
-    'documentacao': '#008080',
-    'rematriculado': '#15803d',
+    'documentacao': '#E0B400',
+    'rematriculado': '#067A7B',
     'desistente': '#ef4444',
   };
   return colors[status] || '#6b7280';
@@ -105,8 +105,8 @@ export const getSourceLabel = (source: string): string => {
 export const getTipoAlunoColor = (tipo: string): string => {
   const colors: Record<string, string> = {
     'Calouro': '#00A9AA',
-    'Veterano': '#FFD600',
-    'Winback': '#f59e0b',
+    'Veterano': '#282828',
+    'Winback': '#E0B400',
   };
   return colors[tipo] || '#6b7280';
 };

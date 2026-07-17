@@ -65,6 +65,29 @@ export interface AlunoFilters {
   assignedTo?: string;
 }
 
+export type ToastType = "success" | "error" | "info";
+
+export interface ToastMessage {
+  id: string;
+  type: ToastType;
+  message: string;
+}
+
+export interface ToastContextType {
+  showToast: (message: string, type?: ToastType) => void;
+}
+
+export interface ConfirmOptions {
+  title?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+}
+
+export interface ConfirmContextType {
+  confirm: (message: string, options?: ConfirmOptions) => Promise<boolean>;
+}
+
 export interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
@@ -80,6 +103,65 @@ export interface PipelineStatusResumo {
   totalValorPendente: number;
 }
 
+// ---- Notificações ----
+
+export type NotificacaoTipo = "mudanca_status" | "nova_interacao" | "recado_admin";
+
+export interface Notificacao {
+  id: string;
+  paraUserId: string;
+  deUserId: string | null;
+  deUserNome?: string;
+  tipo: NotificacaoTipo;
+  titulo: string;
+  corpo: string | null;
+  alunoId: string | null;
+  lida: boolean;
+  createdAt: string;
+}
+
+export interface NotificacoesContextType {
+  notificacoes: Notificacao[];
+  naoLidas: number;
+  isLoading: boolean;
+  marcarLida: (id: string) => Promise<void>;
+  marcarTodasLidas: () => Promise<void>;
+  enviarRecado: (paraUserId: string, titulo: string, corpo: string) => Promise<void>;
+}
+
+// ---- Métricas ----
+
+export interface MetricasGerais {
+  totalAlunos: number;
+  rematriculados: number;
+  taxaConversao: number;
+  valorRecuperado: number;
+  valorTotalCarteira: number;
+  interacoesHoje: number;
+  alunosSemResponsavel: number;
+}
+
+export interface MetricaColaborador {
+  colaboradorId: string;
+  colaboradorNome: string;
+  totalAlunos: number;
+  rematriculados: number;
+  desistentes: number;
+  confirmados: number;
+  pendentes: number;
+  valorRecuperado: number;
+  valorTotalCarteira: number;
+  totalInteracoes: number;
+  taxaConversao: number;
+}
+
+export interface MetricaCanal {
+  canal: string;
+  total: number;
+  rematriculados: number;
+  taxaConversao: number;
+}
+
 export interface AlunosContextType {
   alunos: Aluno[];
   addAluno: (
@@ -90,7 +172,7 @@ export interface AlunosContextType {
   ) => Promise<void>;
   updateAluno: (id: string, aluno: Partial<Aluno>) => Promise<void>;
   deleteAluno: (id: string) => Promise<void>;
-  deleteAlunosBulk: (ids: string[]) => Promise<void>;
+  deleteAlunosBulk: (ids: string[]) => Promise<number>;
   assumirAluno: (id: string) => Promise<void>;
   delegarAluno: (id: string, colaboradorId: string) => Promise<void>;
   addInteraction: (

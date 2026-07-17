@@ -56,22 +56,31 @@ CREATE POLICY "Criar alunos"
   ON public.alunos FOR INSERT TO authenticated
   WITH CHECK (true);
 
+-- NOTA (correção de bug — exclusão em massa falhando para admin):
+-- As policies de UPDATE e DELETE abaixo usavam public.is_admin(), uma função
+-- SECURITY DEFINER. Em operações de linha única funciona normalmente, mas em
+-- operações batch (ex: DELETE ... WHERE id IN (...)) o PostgREST serializa a
+-- operação e a policy é reavaliada linha a linha; nesses casos is_admin()
+-- eventualmente falhava em enxergar o profile do usuário logado dentro do
+-- mesmo batch, fazendo o Supabase silenciar o delete ou retornar 403 mesmo
+-- para admin. Trocamos para uma subquery direta em public.profiles, que é
+-- avaliada de forma estável em cada linha do batch.
 CREATE POLICY "Atualizar alunos por hierarquia"
   ON public.alunos FOR UPDATE TO authenticated
   USING (
-    public.is_admin()
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
     OR responsavel_id = auth.uid()
     OR responsavel_id IS NULL
   )
   WITH CHECK (
-    public.is_admin()
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
     OR responsavel_id = auth.uid()
   );
 
 CREATE POLICY "Deletar alunos por hierarquia"
   ON public.alunos FOR DELETE TO authenticated
   USING (
-    public.is_admin()
+    (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin'
     OR responsavel_id = auth.uid()
   );
 

@@ -1,0 +1,71 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400;
+  padding: 1rem;
+  animation: fadeIn 0.15s ease-in-out;
+}
+
+.modal-recado {
+  width: 100%;
+  max-width: 440px;
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.modal-recado-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.modal-recado-header h2 {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.modal-recado-close {
+  background: none;
+  color: var(--text-secondary);
+  padding: 0.3rem;
+  border-radius: var(--radius-md);
+}
+
+.modal-recado-close:hover {
+  background-color: var(--gray-100);
+  color: var(--ink);
+}
+
+.modal-recado-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-recado .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.modal-recado .form-group label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-recado-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+}
