@@ -48,8 +48,10 @@ function mapDatabaseToAluno(data: any): Aluno {
     createdBy: data.criado_por,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
-    interactions: (data.interacoes || []).map(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+statusAtualizadoEm: data.status_atualizado_em
+      ? new Date(data.status_atualizado_em)
+      : new Date(data.updated_at),
+    interactions: (data.interacoes || []).map(      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (i: any) => ({
         id: i.id,
         alunoId: data.id,

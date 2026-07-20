@@ -9,11 +9,14 @@ export interface User {
 }
 
 export type AlunoStatus =
+  | "cadastrado"
   | "pendente"
   | "contatado"
   | "aguardando_retorno"
   | "confirmado"
   | "documentacao"
+  | "aguardando_matricula"
+  | "matricula_confirmada"
   | "rematriculado"
   | "desistente";
 
@@ -51,6 +54,7 @@ export interface Aluno {
   tags?: string[];
   createdAt: Date;
   updatedAt: Date;
+  statusAtualizadoEm: Date; // desde quando o aluno está no status atual (usado no score de risco de evasão)
   interactions: Interacao[];
   assignedTo?: string;
   createdBy: string;
@@ -191,4 +195,19 @@ export interface AlunosContextType {
   isAdmin: boolean;
   statusResumo: PipelineStatusResumo[];
   colaboradores: { id: string; name: string; email: string }[];
+}
+// ---- Risco de Evasão ----
+
+export type FaixaRisco = "baixo" | "medio" | "alto" | "critico";
+
+export interface AlunoRisco {
+  aluno: Aluno;
+  score: number;
+  faixa: FaixaRisco;
+  diasNoStatus: number;
+  detalhes: {
+    pontosStatus: number;
+    pontosTags: number;
+    multiplicadorTempo: number;
+  };
 }

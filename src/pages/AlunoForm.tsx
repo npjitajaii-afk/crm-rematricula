@@ -4,6 +4,7 @@ import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { AlunoStatus, CanalContato } from "../types";
+import { TAGS_DISPONIVEIS } from "../utils/tags";
 import { ArrowLeft, Save } from "lucide-react";
 import "./AlunoForm.css";
 
@@ -28,7 +29,7 @@ const AlunoForm: React.FC = () => {
     source: existingAluno?.source || ("telefone" as CanalContato),
     value: existingAluno?.value?.toString() || "",
     observations: existingAluno?.observations || "",
-    tags: existingAluno?.tags?.join(", ") || "",
+    tags: existingAluno?.tags || ([] as string[]),
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -42,11 +43,14 @@ const AlunoForm: React.FC = () => {
   }, [isEditing, existingAluno, navigate, showToast]);
 
   const statuses: { value: AlunoStatus; label: string }[] = [
+    { value: "cadastrado", label: "Cadastrado" },
     { value: "pendente", label: "Pendente de Contato" },
     { value: "contatado", label: "Contato Realizado" },
     { value: "aguardando_retorno", label: "Aguardando Retorno" },
     { value: "confirmado", label: "Confirmou Interesse" },
     { value: "documentacao", label: "Documentação/Pagamento" },
+    { value: "aguardando_matricula", label: "Aguardando Matrícula" },
+    { value: "matricula_confirmada", label: "Matrícula Confirmada" },
     { value: "rematriculado", label: "Rematriculado" },
     { value: "desistente", label: "Desistente" },
   ];
@@ -73,6 +77,15 @@ const AlunoForm: React.FC = () => {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
+  };
+
+  const toggleTag = (tag: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      tags: prev.tags.includes(tag)
+        ? prev.tags.filter((t) => t !== tag)
+        : [...prev.tags, tag],
+    }));
   };
 
   const validate = (): boolean => {
@@ -115,12 +128,7 @@ const AlunoForm: React.FC = () => {
         source: formData.source,
         value: formData.value ? parseFloat(formData.value) : undefined,
         observations: formData.observations.trim() || undefined,
-        tags: formData.tags
-          ? formData.tags
-              .split(",")
-              .map((tag) => tag.trim())
-              .filter(Boolean)
-          : [],
+        tags: formData.tags,
       };
 
       if (isEditing) {
@@ -312,16 +320,24 @@ const AlunoForm: React.FC = () => {
           <div className="form-section">
             <h2>Informações Adicionais</h2>
             <div className="form-group">
-              <label htmlFor="tags">Tags</label>
-              <input
-                type="text"
-                id="tags"
-                name="tags"
-                value={formData.tags}
-                onChange={handleChange}
-                placeholder="Separe as tags por vírgula (ex: urgente, bolsista)"
-              />
-              <small>Separe múltiplas tags com vírgula</small>
+              <label>Tags</label>
+              <div className="tags-picker">
+                {TAGS_DISPONIVEIS.map((tag) => {
+                  const selected = formData.tags.includes(tag);
+                  return (
+                    <button
+                      type="button"
+                      key={tag}
+                      className={`tag-chip${selected ? " tag-chip-selected" : ""}`}
+                      onClick={() => toggleTag(tag)}
+                      aria-pressed={selected}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+              <small>Clique para adicionar ou remover uma etiqueta</small>
             </div>
 
             <div className="form-group">

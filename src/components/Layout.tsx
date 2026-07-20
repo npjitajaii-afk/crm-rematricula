@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   BarChart2,
+  TrendingDown,
   LogOut,
   Menu,
   X,
@@ -29,12 +30,11 @@ const Layout: React.FC = () => {
     navigate("/login");
   };
 
-  // Mesmos itens de navegação de sempre — só a apresentação visual mudou
-  // (de lista com texto para ícones com tooltip, como no rail escuro).
   const menuItems = [
-    { path: "/dashboard", icon: LayoutDashboard, label: "Pipeline" },
-    { path: "/alunos", icon: Users, label: "Alunos" },
-    { path: "/metricas", icon: BarChart2, label: "Métricas" },
+    { path: "/dashboard",    icon: LayoutDashboard, label: "Pipeline"        },
+    { path: "/alunos",       icon: Users,           label: "Alunos"          },
+    { path: "/metricas",     icon: BarChart2,       label: "Métricas"        },
+    { path: "/risco-evasao", icon: TrendingDown,    label: "Risco de Evasão" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
