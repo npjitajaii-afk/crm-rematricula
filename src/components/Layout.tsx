@@ -7,6 +7,7 @@ import {
   Users,
   BarChart2,
   TrendingDown,
+  Layers,
   LogOut,
   Menu,
   X,
@@ -35,6 +36,7 @@ const Layout: React.FC = () => {
     { path: "/alunos",       icon: Users,           label: "Alunos"          },
     { path: "/metricas",     icon: BarChart2,       label: "Métricas"        },
     { path: "/risco-evasao", icon: TrendingDown,    label: "Risco de Evasão" },
+    { path: "/grupos",       icon: Layers,          label: "Grupos"          },
   ];
 
   const isActive = (path: string) => location.pathname === path;

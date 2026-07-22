@@ -138,6 +138,7 @@ const AlunoForm: React.FC = () => {
       } else {
         await addAluno({
           ...alunoData,
+          statusAtualizadoEm: new Date(),
           createdBy: user.id,
         });
         showToast("Aluno criado com sucesso!", "success");

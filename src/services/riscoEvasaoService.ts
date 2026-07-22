@@ -96,24 +96,29 @@ export function calcularRiscoAluno(aluno: Aluno): AlunoRisco {
 // ------------------------------------------------------------------
 export function calcularRiscoLista(alunos: Aluno[]): AlunoRisco[] {
   return alunos
-    .filter((a) => a.status !== "rematriculado" && a.status !== "desistente")
+    .filter(
+      (aluno) => aluno.status !== "rematriculado" && aluno.status !== "desistente"
+    )
     .map(calcularRiscoAluno)
     .sort((a, b) => b.score - a.score);
 }
 
 // ------------------------------------------------------------------
-// Resumo por faixa (cards de overview)
+// Resumo por faixa — usado nos cards de filtro da tela
 // ------------------------------------------------------------------
-export interface ResumoRisco {
-  critico: number;
-  alto: number;
-  medio: number;
-  baixo: number;
-  total: number;
-}
+export function calcularResumoRisco(
+  riscos: AlunoRisco[]
+): Record<FaixaRisco, number> {
+  const resumo: Record<FaixaRisco, number> = {
+    critico: 0,
+    alto: 0,
+    medio: 0,
+    baixo: 0,
+  };
 
-export function calcularResumoRisco(riscos: AlunoRisco[]): ResumoRisco {
-  const resumo: ResumoRisco = { critico: 0, alto: 0, medio: 0, baixo: 0, total: riscos.length };
-  for (const r of riscos) resumo[r.faixa]++;
+  for (const risco of riscos) {
+    resumo[risco.faixa]++;
+  }
+
   return resumo;
 }

@@ -107,6 +107,22 @@ export interface PipelineStatusResumo {
   totalValorPendente: number;
 }
 
+// ---- Risco de Evasão ----
+
+export type FaixaRisco = "baixo" | "medio" | "alto" | "critico";
+
+export interface AlunoRisco {
+  aluno: Aluno;
+  score: number;
+  faixa: FaixaRisco;
+  diasNoStatus: number;
+  detalhes: {
+    pontosStatus: number;
+    pontosTags: number;
+    multiplicadorTempo: number;
+  };
+}
+
 // ---- Notificações ----
 
 export type NotificacaoTipo = "mudanca_status" | "nova_interacao" | "recado_admin";
@@ -195,19 +211,4 @@ export interface AlunosContextType {
   isAdmin: boolean;
   statusResumo: PipelineStatusResumo[];
   colaboradores: { id: string; name: string; email: string }[];
-}
-// ---- Risco de Evasão ----
-
-export type FaixaRisco = "baixo" | "medio" | "alto" | "critico";
-
-export interface AlunoRisco {
-  aluno: Aluno;
-  score: number;
-  faixa: FaixaRisco;
-  diasNoStatus: number;
-  detalhes: {
-    pontosStatus: number;
-    pontosTags: number;
-    multiplicadorTempo: number;
-  };
 }

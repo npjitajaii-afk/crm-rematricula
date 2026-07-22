@@ -16,6 +16,7 @@ const AlunoDetails    = lazy(() => import("./pages/AlunoDetails"));
 const AlunoForm       = lazy(() => import("./pages/AlunoForm"));
 const MetricasDashboard = lazy(() => import("./pages/MetricasDashboard"));
 const RiscoEvasao     = lazy(() => import("./pages/RiscoEvasao"));
+const Grupos          = lazy(() => import("./pages/Grupos"));
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
                       <Route path="alunos/:id/edit" element={<AlunoForm />} />
                       <Route path="metricas"     element={<MetricasDashboard />} />
                       <Route path="risco-evasao" element={<RiscoEvasao />} />
+                      <Route path="grupos"       element={<Grupos />} />
                     </Route>
 
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

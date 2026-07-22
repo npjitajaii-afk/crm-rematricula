@@ -64,11 +64,14 @@ export const validatePhone = (phone: string): boolean => {
 
 export const getStatusColor = (status: string): string => {
   const colors: Record<string, string> = {
+    'cadastrado': '#7C8CA6',
     'pendente': '#9CA3AF',
     'contatado': '#4DBDBD',
     'aguardando_retorno': '#FFD600',
     'confirmado': '#00A9AA',
     'documentacao': '#E0B400',
+    'aguardando_matricula': '#F5920A',
+    'matricula_confirmada': '#3B82F6',
     'rematriculado': '#067A7B',
     'desistente': '#ef4444',
   };
@@ -77,11 +80,14 @@ export const getStatusColor = (status: string): string => {
 
 export const getStatusLabel = (status: string): string => {
   const labels: Record<string, string> = {
+    'cadastrado': 'Cadastrado',
     'pendente': 'Pendente de Contato',
     'contatado': 'Contato Realizado',
     'aguardando_retorno': 'Aguardando Retorno',
     'confirmado': 'Confirmou Interesse',
     'documentacao': 'Documentação/Pagamento',
+    'aguardando_matricula': 'Aguardando Matrícula',
+    'matricula_confirmada': 'Matrícula Confirmada',
     'rematriculado': 'Rematriculado',
     'desistente': 'Desistente',
   };
