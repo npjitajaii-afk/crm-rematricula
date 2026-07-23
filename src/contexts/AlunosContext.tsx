@@ -25,6 +25,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   children,
 }) => {
   const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [isLoadingAlunos, setIsLoadingAlunos] = useState(true);
   const [filters, setFilters] = useState<AlunoFilters>({});
   const [statusResumo, setStatusResumo] = useState<PipelineStatusResumo[]>([]);
   const [colaboradores, setColaboradores] = useState<
@@ -39,32 +40,42 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         setAlunos([]);
         setStatusResumo([]);
         setColaboradores([]);
+        setIsLoadingAlunos(false);
         return;
       }
 
-      const { alunos: fetchedAlunos, error } = await getAlunos();
+      setIsLoadingAlunos(true);
 
-      if (error) {
-        console.error("Erro ao carregar alunos:", error);
-      } else {
-        setAlunos(fetchedAlunos);
-      }
+      try {
+        const { alunos: fetchedAlunos, error } = await getAlunos();
 
-      const { resumo, error: resumoError } = await getPipelineResumo();
-      if (resumoError) {
-        console.error("Erro ao carregar resumo do pipeline:", resumoError);
-      } else {
-        setStatusResumo(resumo);
-      }
-
-      if (isAdmin) {
-        const { colaboradores: fetchedColaboradores, error: colaboradoresError } =
-          await getColaboradoresService();
-        if (colaboradoresError) {
-          console.error("Erro ao carregar colaboradores:", colaboradoresError);
+        if (error) {
+          console.error("Erro ao carregar alunos:", error);
         } else {
-          setColaboradores(fetchedColaboradores);
+          setAlunos(fetchedAlunos);
         }
+
+        const { resumo, error: resumoError } = await getPipelineResumo();
+        if (resumoError) {
+          console.error("Erro ao carregar resumo do pipeline:", resumoError);
+        } else {
+          setStatusResumo(resumo);
+        }
+
+        if (isAdmin) {
+          const { colaboradores: fetchedColaboradores, error: colaboradoresError } =
+            await getColaboradoresService();
+          if (colaboradoresError) {
+            console.error("Erro ao carregar colaboradores:", colaboradoresError);
+          } else {
+            setColaboradores(fetchedColaboradores);
+          }
+        }
+      } finally {
+        // Só marca como "carregado" depois que a busca (com sucesso ou erro)
+        // termina — evita que telas como AlunoForm achem que o aluno não
+        // existe só porque a lista ainda não chegou do banco.
+        setIsLoadingAlunos(false);
       }
     };
 
@@ -322,6 +333,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       curso: curso || undefined,
       turno: turno || undefined,
       status: "pendente" as Aluno["status"],
+      statusAtualizadoEm: new Date(),
       source: (pickField(r, ["CANAL", "CANAL_CONTATO", "ORIGEM"]) ||
         "outro") as Aluno["source"],
       value:
@@ -440,6 +452,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     <AlunosContext.Provider
       value={{
         alunos,
+        isLoadingAlunos,
         addAluno,
         updateAluno,
         deleteAluno,

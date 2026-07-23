@@ -130,7 +130,11 @@ const AlunoDetails: React.FC = () => {
 
   const isOwner = aluno.assignedTo === user?.id;
   const semResponsavel = !aluno.assignedTo;
-  const podeEditar = isAdmin || isOwner;
+  // Qualquer colaborador autenticado pode editar o aluno (inclui as tags).
+  // A exclusão continua restrita ao admin ou ao responsável pelo contato,
+  // por ser uma ação destrutiva — separada de propósito da permissão de edição.
+  const podeEditar = !!user;
+  const podeExcluir = isAdmin || isOwner;
 
   const handleAssumir = async () => {
     try {
@@ -180,7 +184,7 @@ const AlunoDetails: React.FC = () => {
               <span>Editar</span>
             </button>
           )}
-          {podeEditar && (
+          {podeExcluir && (
             <button className="btn btn-danger" onClick={handleDelete}>
               <Trash2 size={18} />
               <span>Excluir</span>

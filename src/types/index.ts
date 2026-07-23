@@ -184,6 +184,7 @@ export interface MetricaCanal {
 
 export interface AlunosContextType {
   alunos: Aluno[];
+  isLoadingAlunos: boolean;
   addAluno: (
     aluno: Omit<
       Aluno,

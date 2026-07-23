@@ -11,36 +11,57 @@ import "./AlunoForm.css";
 const AlunoForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getAluno, addAluno, updateAluno } = useAlunos();
+  const { getAluno, addAluno, updateAluno, isLoadingAlunos } = useAlunos();
   const { user } = useAuth();
   const { showToast } = useToast();
   const isEditing = !!id;
 
   const existingAluno = isEditing ? getAluno(id!) : null;
 
-  const [formData, setFormData] = useState({
-    name: existingAluno?.name || "",
-    email: existingAluno?.email || "",
-    phone: existingAluno?.phone || "",
-    ra: existingAluno?.ra || "",
-    curso: existingAluno?.curso || "",
-    turno: existingAluno?.turno || "",
-    status: existingAluno?.status || ("pendente" as AlunoStatus),
-    source: existingAluno?.source || ("telefone" as CanalContato),
-    value: existingAluno?.value?.toString() || "",
-    observations: existingAluno?.observations || "",
-    tags: existingAluno?.tags || ([] as string[]),
-  });
+  const buildFormData = React.useCallback(
+    () => ({
+      name: existingAluno?.name || "",
+      email: existingAluno?.email || "",
+      phone: existingAluno?.phone || "",
+      ra: existingAluno?.ra || "",
+      curso: existingAluno?.curso || "",
+      turno: existingAluno?.turno || "",
+      status: existingAluno?.status || ("pendente" as AlunoStatus),
+      source: existingAluno?.source || ("telefone" as CanalContato),
+      value: existingAluno?.value?.toString() || "",
+      observations: existingAluno?.observations || "",
+      tags: existingAluno?.tags || ([] as string[]),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [existingAluno]
+  );
+
+  const [formData, setFormData] = useState(buildFormData);
+  // Controla se já preenchemos o formulário com os dados reais do aluno
+  // (evita sobrescrever o que o usuário já digitou, caso a lista termine
+  // de carregar bem depois que ele já começou a editar).
+  const [hasHydrated, setHasHydrated] = useState(!isEditing);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Enquanto a lista de alunos ainda está carregando do banco, "não
+  // encontrado" ainda não é um veredito confiável — só decidimos isso
+  // depois que o carregamento inicial terminou.
   useEffect(() => {
-    if (isEditing && !existingAluno) {
+    if (!isEditing || isLoadingAlunos) return;
+
+    if (!existingAluno) {
       showToast("Aluno não encontrado!", "error");
       navigate("/alunos");
+      return;
     }
-  }, [isEditing, existingAluno, navigate, showToast]);
+
+    if (!hasHydrated) {
+      setFormData(buildFormData());
+      setHasHydrated(true);
+    }
+  }, [isEditing, isLoadingAlunos, existingAluno, hasHydrated, buildFormData, navigate, showToast]);
 
   const statuses: { value: AlunoStatus; label: string }[] = [
     { value: "cadastrado", label: "Cadastrado" },
@@ -66,6 +87,23 @@ const AlunoForm: React.FC = () => {
   ];
 
   const turnos = ["Matutino", "Vespertino", "Noturno", "EAD"];
+
+  if (isEditing && !hasHydrated) {
+    return (
+      <div className="lead-form-page">
+        <div className="lead-form-header">
+          <button className="btn btn-secondary" onClick={() => navigate(-1)}>
+            <ArrowLeft size={20} />
+            <span>Voltar</span>
+          </button>
+          <h1>Editar Aluno</h1>
+        </div>
+        <div className="lead-form-container">
+          <p>Carregando dados do aluno...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleChange = (
     e: React.ChangeEvent<
