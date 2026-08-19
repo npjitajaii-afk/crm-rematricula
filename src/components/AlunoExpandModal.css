@@ -185,15 +185,100 @@
   flex-direction: column;
 }
 
+/* Card de anotações: histórico rolável em cima (flex: 1) + campo de novo
+   comentário fixo embaixo (flex-shrink: 0). Só o histórico rola — o resto
+   do modal (cabeçalho, colunas de contato e status/etiquetas) não se
+   mexe, ver pedido do usuário. */
 .aluno-expand-anotacoes {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 0;
+  /* O .card pai já vira flex-column com height:100% (regra existente em
+     .aluno-expand-tab-panel .card), então este container também precisa
+     ocupar o espaço todo pra o histórico ter altura pra rolar dentro. */
+  height: 100%;
 }
 
-.aluno-expand-anotacoes .aluno-expand-textarea {
+.aluno-expand-historico {
   flex: 1;
-  min-height: 140px;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding-right: 0.25rem;
+}
+
+.aluno-expand-comentario {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  background-color: var(--gray-50);
+  border-radius: var(--radius-md);
+}
+
+.aluno-expand-comentario-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.aluno-expand-comentario-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.aluno-expand-comentario-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.aluno-expand-comentario-autor {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.aluno-expand-comentario-data {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.aluno-expand-comentario-texto {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Campo de novo comentário: nunca encolhe nem some, fica sempre visível
+   embaixo do histórico rolável. */
+.aluno-expand-novo-comentario {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+.aluno-expand-novo-comentario .aluno-expand-textarea {
+  min-height: 70px;
+}
+
+.aluno-expand-novo-comentario .btn {
+  align-self: flex-end;
 }
 
 .aluno-expand-textarea {
@@ -213,10 +298,6 @@
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(0, 169, 170, 0.15);
-}
-
-.aluno-expand-anotacoes .btn {
-  align-self: flex-end;
 }
 
 .aluno-expand-tarefas {
