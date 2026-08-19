@@ -1,0 +1,28 @@
+.rematricula-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 0.25rem;
+}
+
+.rematricula-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.rematricula-tab:hover {
+  color: var(--text-primary);
+}
+
+.rematricula-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}

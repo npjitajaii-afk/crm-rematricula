@@ -1,0 +1,251 @@
+.aluno-expand-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(17, 24, 39, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 1000;
+  animation: alunoExpandFadeIn 0.15s ease-out;
+}
+
+.aluno-expand-modal {
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  width: 100%;
+  max-width: 1180px;
+  /* Altura fixa (não só max-height): é o que permite cada coluna ter sua
+     própria rolagem interna, em vez do modal inteiro rolar junto. */
+  height: 88vh;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform-origin: center;
+  animation: alunoExpandGrow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes alunoExpandFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes alunoExpandGrow {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.aluno-expand-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+
+.aluno-expand-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.aluno-expand-modal-title h2 {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.aluno-expand-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.aluno-expand-close:hover {
+  background-color: var(--gray-100);
+  color: var(--text-primary);
+}
+
+.aluno-expand-columns {
+  display: grid;
+  /* Duas laterais do mesmo tamanho, coluna do meio maior */
+  grid-template-columns: 1fr 1.6fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 1.25rem;
+  padding: 1.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.aluno-expand-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+  min-height: 0;
+  /* Cada coluna rola de forma independente das outras duas. */
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.aluno-expand-col .card {
+  margin: 0;
+}
+
+/* Coluna do meio: abas fixas no topo + só o painel ativo rola. */
+.aluno-expand-col-middle {
+  overflow: hidden;
+  padding-right: 0;
+  gap: 0.75rem;
+}
+
+.aluno-expand-tabs {
+  display: flex;
+  gap: 0.375rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.aluno-expand-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1rem;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition);
+  margin-bottom: -1px;
+}
+
+.aluno-expand-tab:hover {
+  color: var(--text-primary);
+}
+
+.aluno-expand-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.aluno-expand-tab-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  background-color: var(--gray-100);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.0625rem 0.4375rem;
+}
+
+.aluno-expand-tab.active .aluno-expand-tab-badge {
+  background-color: var(--primary);
+  color: white;
+}
+
+.aluno-expand-tab-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.aluno-expand-tab-panel .card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.aluno-expand-anotacoes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.aluno-expand-anotacoes .aluno-expand-textarea {
+  flex: 1;
+  min-height: 140px;
+}
+
+.aluno-expand-textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  padding: 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  transition: var(--transition);
+}
+
+.aluno-expand-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 169, 170, 0.15);
+}
+
+.aluno-expand-anotacoes .btn {
+  align-self: flex-end;
+}
+
+.aluno-expand-tarefas {
+  flex: 1;
+}
+
+@media (max-width: 960px) {
+  /* Em telas estreitas as colunas empilham — nesse caso faz mais sentido
+     rolar a tela toda junto do que ter 3 caixinhas de rolagem separadas. */
+  .aluno-expand-modal {
+    height: 95vh;
+    max-height: 95vh;
+  }
+
+  .aluno-expand-columns {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    overflow-y: auto;
+  }
+
+  .aluno-expand-col {
+    overflow-y: visible;
+  }
+
+  .aluno-expand-col-middle {
+    overflow: visible;
+  }
+
+  .aluno-expand-tab-panel {
+    overflow-y: visible;
+  }
+}

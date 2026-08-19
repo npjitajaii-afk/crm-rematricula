@@ -1,0 +1,56 @@
+/* ============================================================
+   Bloco D2 — Seletor de processo (Rematrícula / Retenção / Engajamento)
+   e placeholder de "métricas em preparação".
+   Adicione este trecho ao FINAL do arquivo MetricasDashboard.css
+   já existente no projeto — não substitui nada, só soma.
+   ============================================================ */
+
+.metricas-processo-selector {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background-color: var(--gray-100);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem;
+}
+
+.metricas-processo-tab {
+  border: none;
+  background: transparent;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.metricas-processo-tab:hover {
+  color: var(--ink);
+}
+
+.metricas-processo-tab.active {
+  background-color: var(--bg-primary);
+  color: var(--primary-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.metricas-em-preparacao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.metricas-em-preparacao-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 169, 170, 0.12);
+  color: var(--primary);
+  margin-bottom: 0.25rem;
+}

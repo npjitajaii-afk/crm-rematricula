@@ -1,0 +1,49 @@
+.funil-rematricula {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.funil-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--gray-200);
+  overflow-x: auto;
+}
+
+.funil-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.funil-tab:hover {
+  color: var(--text-primary);
+}
+
+.funil-tab.active {
+  color: var(--primary-dark);
+  border-bottom-color: var(--primary);
+}
+
+.funil-tab-content {
+  min-height: 200px;
+}
+
+.funil-vazio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+}

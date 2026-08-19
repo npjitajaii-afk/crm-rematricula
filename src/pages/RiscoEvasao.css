@@ -1,0 +1,309 @@
+.risco-page {
+  padding: 2rem;
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Cabeçalho ─────────────────────────────────────────────────── */
+
+.risco-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-primary);
+}
+
+.risco-header-title h1 {
+  font-size: 1.75rem;
+  margin: 0;
+}
+
+.risco-subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+/* ── Cards de resumo ────────────────────────────────────────────── */
+
+.risco-resumo {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.resumo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1.25rem 1rem;
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.resumo-numero {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.resumo-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.resumo-critico               { background: #fef2f2; color: #dc2626; }
+.resumo-critico:hover,
+.resumo-critico.ativo         { border-color: #dc2626; background: #fee2e2; }
+
+.resumo-alto                  { background: #fff7ed; color: #ea580c; }
+.resumo-alto:hover,
+.resumo-alto.ativo            { border-color: #ea580c; background: #ffedd5; }
+
+.resumo-medio                 { background: #fefce8; color: #ca8a04; }
+.resumo-medio:hover,
+.resumo-medio.ativo           { border-color: #ca8a04; background: #fef9c3; }
+
+.resumo-baixo                 { background: #f0fdf4; color: #16a34a; }
+.resumo-baixo:hover,
+.resumo-baixo.ativo           { border-color: #16a34a; background: #dcfce7; }
+
+/* ── Filtro ativo ───────────────────────────────────────────────── */
+
+.risco-filtro-ativo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.btn-limpar-filtro {
+  background: none;
+  border: 1px solid var(--gray-300);
+  border-radius: 999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.btn-limpar-filtro:hover {
+  background: var(--gray-100);
+}
+
+/* ── Lista de alunos ────────────────────────────────────────────── */
+
+.risco-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.risco-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: white;
+  border-radius: var(--radius-md);
+  border-left: 4px solid transparent;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.risco-item:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateX(2px);
+}
+
+.risco-item.faixa-critico { border-left-color: #dc2626; }
+.risco-item.faixa-alto    { border-left-color: #ea580c; }
+.risco-item.faixa-medio   { border-left-color: #ca8a04; }
+.risco-item.faixa-baixo   { border-left-color: #16a34a; }
+
+/* ── Score ──────────────────────────────────────────────────────── */
+
+.risco-score-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+  gap: 0.25rem;
+}
+
+.risco-score {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.faixa-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+}
+
+.faixa-badge.faixa-critico { background: #fef2f2; color: #dc2626; }
+.faixa-badge.faixa-alto    { background: #fff7ed; color: #ea580c; }
+.faixa-badge.faixa-medio   { background: #fefce8; color: #ca8a04; }
+.faixa-badge.faixa-baixo   { background: #f0fdf4; color: #16a34a; }
+
+/* ── Info do aluno ──────────────────────────────────────────────── */
+
+.risco-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.risco-nome {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.risco-detalhe {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.risco-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.125rem;
+}
+
+.risco-tag {
+  font-size: 0.6875rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--gray-100);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ── Meta (status + dias) ───────────────────────────────────────── */
+
+.risco-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  min-width: 140px;
+}
+
+.risco-status-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.risco-dias {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gray-400);
+}
+
+.risco-chevron {
+  color: var(--gray-400);
+  flex-shrink: 0;
+}
+
+/* ── Estado vazio ───────────────────────────────────────────────── */
+
+.risco-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
+}
+
+/* ── Legenda ────────────────────────────────────────────────────── */
+
+.risco-legenda {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.risco-legenda summary {
+  padding: 0.875rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: var(--gray-50);
+  user-select: none;
+}
+
+.risco-legenda summary:hover {
+  background: var(--gray-100);
+}
+
+.legenda-corpo {
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.legenda-corpo p {
+  margin: 0 0 0.5rem;
+}
+
+.legenda-corpo ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* ── Responsivo ─────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .risco-page { padding: 1rem; }
+  .risco-resumo { grid-template-columns: repeat(2, 1fr); }
+
+  .risco-item {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .risco-meta {
+    align-items: flex-start;
+    min-width: unset;
+  }
+}
+
+@media (max-width: 480px) {
+  .risco-score-col { min-width: 52px; }
+  .risco-score { font-size: 1.25rem; }
+}

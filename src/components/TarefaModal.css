@@ -1,0 +1,174 @@
+.modal-tarefa {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-tarefa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--gray-100);
+  flex-shrink: 0;
+}
+
+.modal-tarefa-header h2 {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.modal-tarefa-close {
+  background: none;
+  color: var(--text-secondary);
+  padding: 0.3rem;
+  border-radius: var(--radius-md);
+}
+
+.modal-tarefa-close:hover {
+  background-color: var(--gray-100);
+  color: var(--ink);
+}
+
+.modal-tarefa-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+.modal-tarefa .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.modal-tarefa .form-group label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-tarefa .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.tarefa-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  background: var(--bg-secondary, var(--gray-50));
+}
+
+.tarefa-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.tarefa-checklist-item span.done {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.tarefa-check-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  color: var(--text-secondary);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.tarefa-check-btn.done {
+  color: var(--success, #16a34a);
+}
+
+.tarefa-check-icon-pending {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.tarefa-checklist-remove {
+  margin-left: auto;
+  background: none;
+  color: var(--text-secondary);
+  padding: 0.2rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tarefa-checklist-item:hover .tarefa-checklist-remove {
+  opacity: 1;
+}
+
+.tarefa-checklist-remove:hover {
+  color: var(--danger, #dc2626);
+}
+
+.tarefa-checklist-add {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.tarefa-checklist-add input {
+  flex: 1;
+  font-size: 0.875rem;
+}
+
+.btn-sm {
+  padding: 0.35rem 0.5rem;
+}
+
+.modal-tarefa-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+}
+
+.modal-tarefa-actions-right {
+  display: flex;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+.btn-danger-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: 1px solid var(--danger, #dc2626);
+  color: var(--danger, #dc2626);
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.btn-danger-outline:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+@media (max-width: 480px) {
+  .modal-tarefa .form-row {
+    grid-template-columns: 1fr;
+  }
+}

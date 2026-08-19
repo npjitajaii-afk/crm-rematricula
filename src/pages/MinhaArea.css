@@ -1,0 +1,243 @@
+.minha-area-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.minha-area-header h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.minha-area-subtitle {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+/* ---- Cards de totais (mesmo padrão do Dashboard) ---- */
+.resumo-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.resumo-card {
+  background-color: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.resumo-icon {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resumo-icon-primary {
+  background-color: rgba(0, 169, 170, 0.12);
+  color: var(--primary-dark);
+}
+
+.resumo-icon-success {
+  background-color: rgba(34, 197, 94, 0.12);
+  color: var(--success);
+}
+
+.resumo-card > div:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.resumo-numero {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.resumo-label {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+/* ---- Painéis ---- */
+.minha-area-panels {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.panel-card {
+  background-color: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  gap: 0.75rem;
+}
+
+.panel-header h2 {
+  font-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.panel-link {
+  background: none;
+  color: var(--primary-dark);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.panel-link:hover {
+  text-decoration: underline;
+}
+
+.lista-vazia {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  padding: 0.5rem 0;
+}
+
+/* ---- Notificações ---- */
+.notificacoes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.notificacao-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background-color: var(--gray-50);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.9rem;
+}
+
+.notificacao-item.lida {
+  opacity: 0.6;
+}
+
+.notificacao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.notificacao-titulo {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notificacao-corpo {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.notificacao-data {
+  font-size: 0.75rem;
+  color: var(--gray-400);
+  margin-top: 0.15rem;
+}
+
+.notificacao-check {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--gray-300);
+  background-color: #fff;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notificacao-check:hover {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* ---- Meus alunos recentes ---- */
+.alunos-recentes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.aluno-recente-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: none;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+  width: 100%;
+}
+
+.aluno-recente-item:hover {
+  border-color: var(--primary);
+  background-color: rgba(0, 169, 170, 0.05);
+}
+
+.aluno-recente-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.aluno-recente-nome {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.aluno-recente-status {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.aluno-recente-seta {
+  color: var(--gray-300);
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .resumo-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .minha-area-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .resumo-cards {
+    grid-template-columns: 1fr;
+  }
+}

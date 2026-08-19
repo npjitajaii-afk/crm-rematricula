@@ -1,0 +1,142 @@
+.kanban-column {
+  background-color: var(--gray-50);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  min-width: 280px;
+  max-width: 320px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 180px);
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--gray-200);
+  border-left: 4px solid;
+  padding-left: 0.75rem;
+  margin-left: -1rem;
+  padding-right: 1rem;
+}
+
+.column-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.column-count {
+  background-color: var(--gray-200);
+  color: var(--text-secondary);
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.column-outros-info {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  background-color: var(--gray-100);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.5rem;
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.column-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 0.25rem;
+  transition: var(--transition);
+}
+
+.column-content.dragging-over {
+  background-color: rgba(0, 169, 170, 0.08);
+  border-radius: var(--radius-md);
+}
+
+.empty-column {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.empty-column p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Scrollbar customizada para a coluna */
+.column-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.column-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.column-content::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: var(--radius-sm);
+}
+
+.column-content::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+}
+
+@media (max-width: 768px) {
+  .kanban-column {
+    min-width: 260px;
+    max-width: 280px;
+    padding: 0.75rem;
+  }
+
+  .column-header {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.625rem;
+  }
+
+  .column-title {
+    font-size: 0.875rem;
+  }
+
+  .column-count {
+    font-size: 0.6875rem;
+    padding: 0.1875rem 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .kanban-column {
+    min-width: 240px;
+    max-width: 260px;
+    padding: 0.625rem;
+  }
+
+  .column-header {
+    margin-bottom: 0.625rem;
+    padding-bottom: 0.5rem;
+    padding-left: 0.5rem;
+  }
+
+  .column-title {
+    font-size: 0.8125rem;
+  }
+
+  .empty-column {
+    padding: 1.5rem 0.75rem;
+  }
+
+  .empty-column p {
+    font-size: 0.8125rem;
+  }
+}

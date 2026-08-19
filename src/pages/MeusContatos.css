@@ -1,0 +1,35 @@
+.meus-contatos-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.meus-contatos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.meus-contatos-header h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.meus-contatos-subtitle {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+}
+
+.meus-contatos-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.meus-contatos-actions .btn {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
