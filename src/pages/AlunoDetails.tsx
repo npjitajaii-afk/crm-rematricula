@@ -442,13 +442,14 @@ const AlunoDetails: React.FC = () => {
 
         {/* Sidebar */}
         <div className="lead-sidebar">
-          {/* Checklist de Engajamento (só existe para alunos da área
-              "engajamento" — ver database/009_checklist_engajamento.sql) */}
-          {aluno.area === "engajamento" && (
+          {/* Checklist (só existe para alunos das áreas "engajamento" e
+              "rematricula" — ver database/009_checklist_engajamento.sql
+              e database/016_checklist_rematricula.sql) */}
+          {(aluno.area === "engajamento" || aluno.area === "rematricula") && (
             <div className="card">
               <h3>
                 <ListChecks size={18} style={{ marginRight: "0.375rem" }} />
-                Checklist de Engajamento
+                {aluno.area === "rematricula" ? "Checklist de Rematrícula" : "Checklist de Engajamento"}
               </h3>
               {(() => {
                 const itens = itensPorAluno[aluno.id] || [];

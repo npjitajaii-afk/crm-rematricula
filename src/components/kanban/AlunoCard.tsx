@@ -57,8 +57,13 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   const { user } = useAuth();
 
   // Checklist só existe (é criada automaticamente pelo banco) para
-  // alunos da área "engajamento" — ver database/009_checklist_engajamento.sql.
-  const itensChecklist = aluno.area === "engajamento" ? itensPorAluno[aluno.id] : undefined;
+  // alunos das áreas "engajamento" e "rematricula" — ver
+  // database/009_checklist_engajamento.sql e
+  // database/016_checklist_rematricula.sql.
+  const itensChecklist =
+    aluno.area === "engajamento" || aluno.area === "rematricula"
+      ? itensPorAluno[aluno.id]
+      : undefined;
   // Resumo de WhatsApp vale pra qualquer área — a mensagem chega pelo
   // telefone, independente do funil em que o aluno está.
   const resumoWhatsapp = resumoPorAluno[aluno.id];

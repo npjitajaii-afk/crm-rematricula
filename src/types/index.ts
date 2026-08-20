@@ -159,11 +159,14 @@ export interface AlunoRisco {
   };
 }
 
-// ---- Checklist de Engajamento ----
+// ---- Checklist de Engajamento / Rematrícula ----
 // Tarefas fixas criadas automaticamente (via trigger no banco, ver
 // database/009_checklist_engajamento.sql) para todo aluno que entra na
 // área "engajamento". O colaborador vai marcando conforme confirma cada
 // etapa de ambientação do calouro.
+// As mesmas linhas (tabela engajamento_checklist_itens) também são
+// criadas para alunos da área "rematricula", com outro conjunto de
+// itens — ver database/016_checklist_rematricula.sql.
 export type ChecklistItemKey =
   | "login_leo_app"
   | "acessou_teams"
@@ -171,7 +174,12 @@ export type ChecklistItemKey =
   | "acessou_livros"
   | "fez_av1"
   | "fez_av4"
-  | "pagou_primeiro_boleto";
+  | "pagou_primeiro_boleto"
+  | "email_enviado"
+  | "whatsapp_enviado"
+  | "possui_horas_extensao"
+  | "possui_horas_complementares"
+  | "aceite_contrato";
 
 export interface ChecklistItem {
   id: string;
