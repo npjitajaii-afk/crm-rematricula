@@ -447,28 +447,21 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     const total = alunosData.length;
     if (total === 0) {
       onProgress?.(0, 0);
-      return;
+      return { imported: 0, duplicados: 0 };
     }
 
     // Em vez de 1 requisição por aluno (o que trava o navegador com
     // centenas de conexões simultâneas), agrupamos em lotes: poucas
     // requisições, cada uma já inserindo várias linhas de uma vez.
+    // A checagem de duplicados (por RA, ou por nome+telefone) roda dentro
+    // de createAlunosBulk sobre o arquivo inteiro de uma vez, pra pegar
+    // duplicidade mesmo entre linhas que caem em lotes diferentes.
     const batchSize = 200;
-    let done = 0;
-    const createdAlunos: Aluno[] = [];
-    const errors: string[] = [];
-
-    for (let i = 0; i < alunosData.length; i += batchSize) {
-      const batch = alunosData.slice(i, i + batchSize);
-      const { alunos: inserted, errors: batchErrors } = await createAlunosBulk(
-        batch,
-        batchSize
-      );
-      createdAlunos.push(...inserted);
-      errors.push(...batchErrors);
-      done += batch.length;
-      onProgress?.(Math.min(done, total), total);
-    }
+    const { alunos: createdAlunos, errors, duplicados } = await createAlunosBulk(
+      alunosData,
+      batchSize,
+      onProgress
+    );
 
     // Atualiza a lista local imediatamente com o que foi inserido, sem
     // esperar por um novo fetch completo — evita recarregar tudo do zero
@@ -482,6 +475,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         `Alguns lotes falharam ao importar: ${errors.join("; ")}`
       );
     }
+
+    return { imported: createdAlunos.length, duplicados };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -575,18 +570,14 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     }
 
     const batchSize = 200;
-    const createdAlunos: Aluno[] = [];
-    const errors: string[] = [];
-    for (let index = 0; index < alunosData.length; index += batchSize) {
-      const batch = alunosData.slice(index, index + batchSize);
-      const { alunos: inserted, errors: batchErrors } = await createAlunosBulk(batch, batchSize);
-      createdAlunos.push(...inserted);
-      errors.push(...batchErrors);
-      onProgress?.(Math.min(index + batch.length, alunosData.length), alunosData.length);
-    }
+    const { alunos: createdAlunos, errors, duplicados } = await createAlunosBulk(
+      alunosData,
+      batchSize,
+      onProgress
+    );
     if (createdAlunos.length > 0) setAlunos((prev) => [...createdAlunos, ...prev]);
     if (errors.length > 0) throw new Error(`Alguns lotes falharam ao importar: ${errors.join("; ")}`);
-    return { imported: createdAlunos.length, ignored };
+    return { imported: createdAlunos.length, ignored, duplicados };
   }, [user]);
 
   // Otimização 5.1: também usa import dinâmico do xlsx na exportação.

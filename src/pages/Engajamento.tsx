@@ -50,13 +50,11 @@ const Engajamento: React.FC = () => {
     deleteAlunosBulk,
     assumirAluno,
     isAdmin,
+    colaboradores,
   } = useAlunos();
 
   const filteredAlunos = filteredAlunosTodasAreas.filter(
-    // A aba "Alunos" funciona como fila de distribuição. Assim que o
-    // contato é assumido ou delegado, ele deixa esta fila e passa a aparecer
-    // somente em "Meus Contatos" do responsável.
-    (aluno) => aluno.area === "engajamento" && !aluno.assignedTo
+    (aluno) => aluno.area === "engajamento"
   );
 
   const { user } = useAuth();
@@ -144,11 +142,13 @@ const Engajamento: React.FC = () => {
     setImportProgress({ done: 0, total: 0 });
 
     try {
-      const { imported, ignored } = await importAlunosEngajamento(file, (done, total) => {
+      const { imported, ignored, duplicados } = await importAlunosEngajamento(file, (done, total) => {
         setImportProgress({ done, total });
       });
       showToast(
-        `${imported} card(s) criado(s) para o polo de Itajaí${ignored ? `; ${ignored} registro(s) de outros polos ignorado(s).` : "."}`,
+        `${imported} card(s) criado(s) para o polo de Itajaí` +
+          (ignored ? `; ${ignored} registro(s) de outros polos ignorado(s)` : "") +
+          (duplicados ? `; ${duplicados} contato(s) já existente(s) ignorado(s) (duplicado).` : ".") ,
         "success"
       );
     } catch (error) {
@@ -241,8 +241,8 @@ const Engajamento: React.FC = () => {
           <div className="alunos-swipe-hint">
             <MoveHorizontal size={14} />
             <span>
-              Use os botões da linha para assumir ou delegar um contato. As
-              demais ações continuam disponíveis ao arrastar para o lado.
+              Arraste uma linha pro lado (clique e segure) pra ver, editar,
+              assumir ou excluir um aluno.
             </span>
             {isAdmin && (
               <label style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.4rem" }}>
@@ -269,6 +269,7 @@ const Engajamento: React.FC = () => {
                 aluno={aluno}
                 statusLabel={statuses.find((s) => s.value === aluno.status)?.label}
                 sourceLabel={sources.find((s) => s.value === aluno.source)?.label}
+                responsavelNome={colaboradores.find((c) => c.id === aluno.assignedTo)?.name}
                 showSelect={isAdmin}
                 selected={selectedIds.includes(aluno.id)}
                 onToggleSelect={() => toggleSelect(aluno.id)}

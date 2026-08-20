@@ -32,6 +32,7 @@ const Alunos: React.FC = () => {
     deleteAlunosBulk,
     assumirAluno,
     isAdmin,
+    colaboradores,
   } = useAlunos();
 
   // Esta página é exclusiva do funil de Rematrícula. Retenção e Engajamento
@@ -159,10 +160,15 @@ const Alunos: React.FC = () => {
     setImportProgress({ done: 0, total: 0 });
 
     try {
-      await importAlunos(file, (done, total) => {
+      const { duplicados } = await importAlunos(file, (done, total) => {
         setImportProgress({ done, total });
       });
-      showToast("Alunos importados com sucesso!", "success");
+      showToast(
+        duplicados > 0
+          ? `Alunos importados! ${duplicados} contato(s) ignorado(s) por já existir (RA ou nome+telefone repetido).`
+          : "Alunos importados com sucesso!",
+        "success"
+      );
     } catch (err) {
       showToast(
         err instanceof Error
@@ -442,6 +448,7 @@ const Alunos: React.FC = () => {
                 aluno={aluno}
                 statusLabel={statuses.find((s) => s.value === aluno.status)?.label}
                 sourceLabel={sources.find((s) => s.value === aluno.source)?.label}
+                responsavelNome={colaboradores.find((c) => c.id === aluno.assignedTo)?.name}
                 showSelect={isAdmin}
                 selected={selectedIds.includes(aluno.id)}
                 onToggleSelect={() => toggleSelect(aluno.id)}

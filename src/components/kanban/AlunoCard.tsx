@@ -57,13 +57,8 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   const { user } = useAuth();
 
   // Checklist só existe (é criada automaticamente pelo banco) para
-  // alunos das áreas "engajamento" e "rematricula" — ver
-  // database/009_checklist_engajamento.sql e
-  // database/016_checklist_rematricula.sql.
-  const itensChecklist =
-    aluno.area === "engajamento" || aluno.area === "rematricula"
-      ? itensPorAluno[aluno.id]
-      : undefined;
+  // alunos da área "engajamento" — ver database/009_checklist_engajamento.sql.
+  const itensChecklist = aluno.area === "engajamento" ? itensPorAluno[aluno.id] : undefined;
   // Resumo de WhatsApp vale pra qualquer área — a mensagem chega pelo
   // telefone, independente do funil em que o aluno está.
   const resumoWhatsapp = resumoPorAluno[aluno.id];
@@ -77,6 +72,11 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   // types/index.ts) — resolvido aqui contra a lista de colaboradores/admins
   // já carregada pelo contexto, sem precisar de outra consulta.
   const criadoPorNome = colaboradores.find((c) => c.id === aluno.createdBy)?.name;
+
+  // Nome de quem é responsável pelo contato (assignedTo). Precisa aparecer
+  // pra todo mundo que usa o CRM, independente de quem assumiu — é um
+  // controle operacional pedido pelo usuário, válido nos 3 funis.
+  const responsavelNome = colaboradores.find((c) => c.id === aluno.assignedTo)?.name;
 
   const handleClick = () => {
     setExpandido(true);
@@ -130,6 +130,10 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
           Agenda hoje{compromisso.ticket ? ` · Ticket ${compromisso.ticket}` : ""}
         </span>
       ))}
+
+      <span className={`lead-responsavel-badge ${responsavelNome ? "" : "lead-responsavel-badge--vazio"}`}>
+        {responsavelNome ? `Responsável: ${responsavelNome}` : "Sem responsável"}
+      </span>
 
       {tipoAluno && (
         <span

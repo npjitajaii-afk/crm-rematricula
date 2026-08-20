@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -8,22 +8,17 @@ import {
   Tag,
   ListChecks,
   Check,
-  Send,
+  Save,
   Hash,
-  MessageSquare,
+  Users,
 } from "lucide-react";
 import { useAlunos } from "../hooks/useAlunos";
-import { useAuth } from "../hooks/useAuth";
 import { useChecklist } from "../hooks/useChecklist";
 import { useToast } from "../hooks/useToast";
 import { AlunoStatus } from "../types";
 import { AREA_CONFIG } from "../config/areas";
 import { TAGS_SELECIONAVEIS_POR_AREA, TAGS_DISPONIVEIS } from "../utils/tags";
-import {
-  getStatusColor,
-  getStatusLabel,
-  formatDateTime,
-} from "../utils/formatters";
+import { getStatusColor, getStatusLabel } from "../utils/formatters";
 import "../pages/AlunoDetails.css";
 import "../pages/AlunoForm.css";
 import "./AlunoExpandModal.css";
@@ -45,32 +40,27 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   alunoId,
   onClose,
 }) => {
-  const { getAluno, updateAluno, addInteraction } = useAlunos();
-  const { user } = useAuth();
+  const { getAluno, updateAluno, colaboradores } = useAlunos();
   const { itensPorAluno, toggleItem, isLoading: checklistCarregando } =
     useChecklist();
   const { showToast } = useToast();
 
   const [aluno, setAluno] = useState(getAluno(alunoId));
-  // Novo comentário sendo digitado (o campo fica sempre vazio depois de
-  // enviar — o histórico é uma lista de entradas, não mais um texto único
-  // que se sobrescreve, ver pedido do usuário).
-  const [novoComentario, setNovoComentario] = useState("");
-  const [enviandoComentario, setEnviandoComentario] = useState(false);
+  const [observacoes, setObservacoes] = useState(aluno?.observations || "");
+  const [salvandoObs, setSalvandoObs] = useState(false);
   // Anotações e Tarefas dividem a coluna do meio em abas — só uma fica
   // visível por vez (ver pedido do usuário).
   const [abaMeio, setAbaMeio] = useState<"anotacoes" | "tarefas">(
     "anotacoes"
   );
-  // Rola o histórico de comentários pro final (mais recente) sempre que
-  // uma nova entrada é adicionada.
-  const historicoRef = useRef<HTMLDivElement>(null);
 
-  // Re-sincroniza quando o card clicado muda.
+  // Re-sincroniza quando o card clicado muda (não a cada atualização de
+  // status/tag do mesmo aluno, pra não sobrescrever o que o usuário está
+  // digitando na caixa de anotações).
   useEffect(() => {
     const atual = getAluno(alunoId);
     setAluno(atual);
-    setNovoComentario("");
+    setObservacoes(atual?.observations || "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alunoId]);
 
@@ -122,38 +112,20 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
     }
   };
 
-  // Histórico de comentários (tipo "nota" em `interacoes`), do mais antigo
-  // pro mais recente — igual timeline de chat, mensagem nova embaixo.
-  const comentarios = [...aluno.interactions]
-    .filter((i) => i.type === "nota")
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-  const handleEnviarComentario = async () => {
-    if (!novoComentario.trim() || !user) return;
-    setEnviandoComentario(true);
+  const handleSalvarObservacoes = async () => {
+    setSalvandoObs(true);
     try {
-      await addInteraction(aluno.id, {
-        type: "nota",
-        description: novoComentario.trim(),
-        date: new Date(),
-        userId: user.id,
-        userName: user.name,
-      });
-      setNovoComentario("");
+      await updateAluno(aluno.id, { observations: observacoes });
       refreshAluno();
-      // Rola pro final assim que a nova entrada renderizar.
-      requestAnimationFrame(() => {
-        historicoRef.current?.scrollTo({
-          top: historicoRef.current.scrollHeight,
-          behavior: "smooth",
-        });
-      });
+      showToast("Anotação salva!", "success");
     } catch {
-      showToast("Erro ao adicionar comentário. Tente novamente.", "error");
+      showToast("Erro ao salvar anotação. Tente novamente.", "error");
     } finally {
-      setEnviandoComentario(false);
+      setSalvandoObs(false);
     }
   };
+
+  const obsAlterada = observacoes !== (aluno.observations || "");
 
   return createPortal(
     <div
@@ -234,6 +206,16 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
                   </div>
                 </div>
               )}
+
+              <div className="info-item">
+                <Users size={18} />
+                <div>
+                  <span className="info-label">Responsável</span>
+                  <span className="info-value">
+                    {colaboradores.find((c) => c.id === aluno.assignedTo)?.name || "Sem responsável"}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -270,63 +252,20 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
             <div className="aluno-expand-tab-panel">
               {abaMeio === "anotacoes" ? (
                 <div className="card aluno-expand-anotacoes">
-                  {/* Histórico: só esta lista rola — o cabeçalho do modal e
-                      as colunas laterais (contato / status / etiquetas)
-                      ficam parados, ver pedido do usuário. */}
-                  <div
-                    className="aluno-expand-historico"
-                    ref={historicoRef}
+                  <textarea
+                    className="aluno-expand-textarea"
+                    value={observacoes}
+                    onChange={(e) => setObservacoes(e.target.value)}
+                    placeholder="Escreva uma anotação sobre este aluno..."
+                  />
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handleSalvarObservacoes}
+                    disabled={!obsAlterada || salvandoObs}
                   >
-                    {comentarios.length === 0 ? (
-                      <p className="checklist-vazio">
-                        Nenhum comentário ainda. Escreva o primeiro abaixo.
-                      </p>
-                    ) : (
-                      comentarios.map((c) => (
-                        <div key={c.id} className="aluno-expand-comentario">
-                          <div className="aluno-expand-comentario-icon">
-                            <MessageSquare size={14} />
-                          </div>
-                          <div className="aluno-expand-comentario-content">
-                            <div className="aluno-expand-comentario-header">
-                              <span className="aluno-expand-comentario-autor">
-                                {c.userName || "—"}
-                              </span>
-                              <span className="aluno-expand-comentario-data">
-                                {formatDateTime(c.date)}
-                              </span>
-                            </div>
-                            <p className="aluno-expand-comentario-texto">
-                              {c.description}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="aluno-expand-novo-comentario">
-                    <textarea
-                      className="aluno-expand-textarea"
-                      value={novoComentario}
-                      onChange={(e) => setNovoComentario(e.target.value)}
-                      placeholder="Escreva um comentário sobre este aluno..."
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                          e.preventDefault();
-                          handleEnviarComentario();
-                        }
-                      }}
-                    />
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={handleEnviarComentario}
-                      disabled={!novoComentario.trim() || enviandoComentario}
-                    >
-                      <Send size={14} />
-                      {enviandoComentario ? "Enviando..." : "Comentar"}
-                    </button>
-                  </div>
+                    <Save size={14} />
+                    {salvandoObs ? "Salvando..." : "Salvar anotação"}
+                  </button>
                 </div>
               ) : (
                 <div className="card aluno-expand-tarefas">

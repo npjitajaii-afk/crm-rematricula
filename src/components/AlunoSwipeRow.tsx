@@ -17,6 +17,13 @@ interface AlunoSwipeRowProps {
   aluno: Aluno;
   statusLabel?: string;
   sourceLabel?: string;
+  /**
+   * Nome de quem é responsável pelo contato (assignedTo resolvido contra a
+   * lista de colaboradores). Precisa aparecer pra todo mundo que usa o CRM,
+   * não só pra quem assumiu — é um controle operacional (ver pedido do
+   * usuário: visibilidade de responsável em todos os funis).
+   */
+  responsavelNome?: string;
   showSelect: boolean;
   selected: boolean;
   onToggleSelect: () => void;
@@ -44,6 +51,7 @@ const AlunoSwipeRow: React.FC<AlunoSwipeRowProps> = ({
   aluno,
   statusLabel,
   sourceLabel,
+  responsavelNome,
   showSelect,
   selected,
   onToggleSelect,
@@ -186,79 +194,89 @@ const AlunoSwipeRow: React.FC<AlunoSwipeRowProps> = ({
           onPointerUp={finishDrag}
           onPointerCancel={finishDrag}
         >
-          <div className="aluno-row-main">
-            <strong className="aluno-row-name">{aluno.name}</strong>
-            {aluno.ra && <span className="aluno-row-ra">RA: {aluno.ra}</span>}
+          {/* Linha principal: sempre com a mesma estrutura pra todo
+              contato, com ou sem responsável — assim o nome fica sempre
+              na mesma posição, linha após linha. A ação de assumir/
+              delegar (quando existe) vai numa segunda linha, abaixo. */}
+          <div className="aluno-row-info">
+            <div className="aluno-row-main">
+              <strong className="aluno-row-name">{aluno.name}</strong>
+              {aluno.ra && <span className="aluno-row-ra">RA: {aluno.ra}</span>}
+            </div>
+
+            {aluno.curso && (
+              <div className="aluno-row-field aluno-row-curso">
+                <GraduationCap size={14} />
+                <span>
+                  {aluno.curso}
+                  {aluno.turno ? ` · ${aluno.turno}` : ""}
+                </span>
+              </div>
+            )}
+
+            <div className="aluno-row-field aluno-row-contato">
+              <Mail size={14} />
+              <span>{aluno.email}</span>
+              <Phone size={14} />
+              <span>{aluno.phone}</span>
+            </div>
+
+            <span
+              className="aluno-row-status"
+              style={{ backgroundColor: getStatusColor(aluno.status) }}
+            >
+              {statusLabel}
+            </span>
+
+            {sourceLabel && (
+              <span className="aluno-row-source">{sourceLabel}</span>
+            )}
+
+            {!!aluno.value && (
+              <span className="aluno-row-value">{formatCurrency(aluno.value)}</span>
+            )}
+
+            <div className="aluno-row-field aluno-row-data">
+              <Calendar size={14} />
+              <span>{formatDate(aluno.createdAt)}</span>
+            </div>
           </div>
 
-          {aluno.curso && (
-            <div className="aluno-row-field aluno-row-curso">
-              <GraduationCap size={14} />
-              <span>
-                {aluno.curso}
-                {aluno.turno ? ` · ${aluno.turno}` : ""}
+          <div className="aluno-row-primary-actions">
+            {podeAssumir && (
+              <button
+                type="button"
+                className="aluno-row-primary-action"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAssumir();
+                }}
+              >
+                <UserPlus size={16} />
+                Assumir contato
+              </button>
+            )}
+            {podeDelegar && onDelegar && (
+              <button
+                type="button"
+                className="aluno-row-primary-action"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelegar();
+                }}
+              >
+                <Users size={16} />
+                Delegar contato
+              </button>
+            )}
+            {!podeAssumir && !podeDelegar && responsavelNome && (
+              <span className="aluno-row-responsavel">
+                <UserPlus size={13} />
+                {responsavelNome}
               </span>
-            </div>
-          )}
-
-          <div className="aluno-row-field aluno-row-contato">
-            <Mail size={14} />
-            <span>{aluno.email}</span>
-            <Phone size={14} />
-            <span>{aluno.phone}</span>
-          </div>
-
-          <span
-            className="aluno-row-status"
-            style={{ backgroundColor: getStatusColor(aluno.status) }}
-          >
-            {statusLabel}
-          </span>
-
-          {sourceLabel && (
-            <span className="aluno-row-source">{sourceLabel}</span>
-          )}
-
-          {!!aluno.value && (
-            <span className="aluno-row-value">{formatCurrency(aluno.value)}</span>
-          )}
-
-          {(podeAssumir || podeDelegar) && (
-            <div className="aluno-row-primary-actions">
-              {podeAssumir && (
-                <button
-                  type="button"
-                  className="aluno-row-primary-action"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onAssumir();
-                  }}
-                >
-                  <UserPlus size={16} />
-                  Assumir contato
-                </button>
-              )}
-              {podeDelegar && onDelegar && (
-                <button
-                  type="button"
-                  className="aluno-row-primary-action"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelegar();
-                  }}
-                >
-                  <Users size={16} />
-                  Delegar contato
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="aluno-row-field aluno-row-data">
-            <Calendar size={14} />
-            <span>{formatDate(aluno.createdAt)}</span>
+            )}
           </div>
         </div>
       </div>

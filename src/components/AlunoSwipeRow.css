@@ -83,9 +83,8 @@
 .aluno-row-content {
   position: relative;
   display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 1.25rem;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 0.875rem 1.25rem;
   background-color: #fff;
   cursor: grab;
@@ -102,6 +101,19 @@
 
 .aluno-row-content:hover {
   background-color: var(--gray-50);
+}
+
+/* Linha com os dados do contato (nome, RA, curso, contato, status,
+   responsável, valor, data). Sempre a mesma estrutura, com ou sem
+   responsável — garante que o nome fique na mesma posição em toda
+   linha da lista. O botão de assumir/delegar (quando existe) fica fora
+   daqui, numa segunda linha abaixo (.aluno-row-primary-actions). */
+.aluno-row-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 1.25rem;
+  width: 100%;
 }
 
 .aluno-row-main {
@@ -159,6 +171,17 @@
   white-space: nowrap;
 }
 
+.aluno-row-responsavel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .aluno-row-value {
   flex-shrink: 0;
   font-size: 0.8125rem;
@@ -212,6 +235,10 @@
   .aluno-row-content {
     gap: 0.75rem;
     padding: 0.75rem 1rem;
+  }
+
+  .aluno-row-info {
+    gap: 0.75rem;
   }
 
   .aluno-row-primary-actions {
