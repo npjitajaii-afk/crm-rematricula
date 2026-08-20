@@ -261,7 +261,7 @@ const Engajamento: React.FC = () => {
             const semResponsavel = !aluno.assignedTo;
             const podeEditar = isAdmin || isOwner;
             const podeAssumir = !isAdmin && semResponsavel;
-            const podeDelegar = isAdmin && semResponsavel;
+            const podeDelegar = isAdmin;
 
             return (
               <AlunoSwipeRow

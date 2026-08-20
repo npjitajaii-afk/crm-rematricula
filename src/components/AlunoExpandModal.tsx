@@ -11,8 +11,11 @@ import {
   Save,
   Hash,
   Users,
+  Trash2,
+  MessageSquare,
 } from "lucide-react";
 import { useAlunos } from "../hooks/useAlunos";
+import { useAuth } from "../hooks/useAuth";
 import { useChecklist } from "../hooks/useChecklist";
 import { useToast } from "../hooks/useToast";
 import { AlunoStatus } from "../types";
@@ -22,6 +25,14 @@ import { getStatusColor, getStatusLabel } from "../utils/formatters";
 import "../pages/AlunoDetails.css";
 import "../pages/AlunoForm.css";
 import "./AlunoExpandModal.css";
+
+interface AnotacaoEntry {
+  id: string;
+  texto: string;
+  autorNome: string;
+  autorId: string;
+  criadaEm: string;
+}
 
 interface AlunoExpandModalProps {
   /** Id do aluno cujo card foi clicado — sempre buscamos a versão mais
@@ -40,13 +51,14 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   alunoId,
   onClose,
 }) => {
-  const { getAluno, updateAluno, colaboradores } = useAlunos();
+  const { getAluno, updateAluno, colaboradores, isAdmin } = useAlunos();
   const { itensPorAluno, toggleItem, isLoading: checklistCarregando } =
     useChecklist();
   const { showToast } = useToast();
 
+  const { user } = useAuth();
   const [aluno, setAluno] = useState(getAluno(alunoId));
-  const [observacoes, setObservacoes] = useState(aluno?.observations || "");
+  const [novaAnotacao, setNovaAnotacao] = useState("");
   const [salvandoObs, setSalvandoObs] = useState(false);
   // Anotações e Tarefas dividem a coluna do meio em abas — só uma fica
   // visível por vez (ver pedido do usuário).
@@ -54,15 +66,25 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
     "anotacoes"
   );
 
-  // Re-sincroniza quando o card clicado muda (não a cada atualização de
-  // status/tag do mesmo aluno, pra não sobrescrever o que o usuário está
-  // digitando na caixa de anotações).
+  // Interpreta o campo observations como lista de entradas JSON.
+  // Formato: [{id, texto, autorNome, autorId, criadaEm}]
+  // Se for string simples (legado), converte em uma entrada.
+  const parseAnotacoes = (raw: string | undefined) => {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as AnotacaoEntry[];
+      return [{ id: "legado", texto: raw, autorNome: "—", autorId: "", criadaEm: "" }];
+    } catch {
+      return [{ id: "legado", texto: raw, autorNome: "—", autorId: "", criadaEm: "" }];
+    }
+  };
+
+  // Re-sincroniza o aluno local sempre que o contexto atualizar o registro.
   useEffect(() => {
     const atual = getAluno(alunoId);
     setAluno(atual);
-    setObservacoes(atual?.observations || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alunoId]);
+  }, [alunoId, getAluno]);
 
   // Fecha com Esc.
   useEffect(() => {
@@ -112,11 +134,22 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
     }
   };
 
-  const handleSalvarObservacoes = async () => {
+  const anotacoes = parseAnotacoes(aluno.observations);
+
+  const handleSalvarAnotacao = async () => {
+    if (!novaAnotacao.trim()) return;
     setSalvandoObs(true);
     try {
-      await updateAluno(aluno.id, { observations: observacoes });
-      refreshAluno();
+      const novaEntrada: AnotacaoEntry = {
+        id: crypto.randomUUID(),
+        texto: novaAnotacao.trim(),
+        autorNome: user?.name || user?.email || "Desconhecido",
+        autorId: user?.id || "",
+        criadaEm: new Date().toISOString(),
+      };
+      const atualizado = JSON.stringify([novaEntrada, ...anotacoes]);
+      await updateAluno(aluno.id, { observations: atualizado });
+      setNovaAnotacao("");
       showToast("Anotação salva!", "success");
     } catch {
       showToast("Erro ao salvar anotação. Tente novamente.", "error");
@@ -125,7 +158,17 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
     }
   };
 
-  const obsAlterada = observacoes !== (aluno.observations || "");
+  const handleDeletarAnotacao = async (id: string) => {
+    const restantes = anotacoes.filter((a) => a.id !== id);
+    try {
+      await updateAluno(aluno.id, {
+        observations: restantes.length > 0 ? JSON.stringify(restantes) : undefined,
+      });
+      showToast("Anotação excluída.", "success");
+    } catch {
+      showToast("Erro ao excluir anotação. Tente novamente.", "error");
+    }
+  };
 
   return createPortal(
     <div
@@ -252,20 +295,64 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
             <div className="aluno-expand-tab-panel">
               {abaMeio === "anotacoes" ? (
                 <div className="card aluno-expand-anotacoes">
-                  <textarea
-                    className="aluno-expand-textarea"
-                    value={observacoes}
-                    onChange={(e) => setObservacoes(e.target.value)}
-                    placeholder="Escreva uma anotação sobre este aluno..."
-                  />
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={handleSalvarObservacoes}
-                    disabled={!obsAlterada || salvandoObs}
-                  >
-                    <Save size={14} />
-                    {salvandoObs ? "Salvando..." : "Salvar anotação"}
-                  </button>
+                  <div className="anotacoes-nova">
+                    <textarea
+                      className="aluno-expand-textarea"
+                      value={novaAnotacao}
+                      onChange={(e) => setNovaAnotacao(e.target.value)}
+                      placeholder="Escreva uma anotação sobre este aluno..."
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                          handleSalvarAnotacao();
+                        }
+                      }}
+                    />
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSalvarAnotacao}
+                      disabled={!novaAnotacao.trim() || salvandoObs}
+                    >
+                      <Save size={14} />
+                      {salvandoObs ? "Salvando..." : "Salvar anotação"}
+                    </button>
+                  </div>
+                  {anotacoes.length > 0 && (
+                    <div className="anotacoes-historico">
+                      {anotacoes.map((entrada) => (
+                        <div key={entrada.id} className="anotacao-entrada">
+                          <div className="anotacao-meta">
+                            <span className="anotacao-autor">
+                              <MessageSquare size={11} />
+                              {entrada.autorNome}
+                            </span>
+                            {entrada.criadaEm && (
+                              <span className="anotacao-data">
+                                {new Date(entrada.criadaEm).toLocaleString("pt-BR", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "2-digit",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            )}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                className="anotacao-deletar"
+                                title="Excluir anotação"
+                                onClick={() => handleDeletarAnotacao(entrada.id)}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                          <p className="anotacao-texto">{entrada.texto}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="card aluno-expand-tarefas">

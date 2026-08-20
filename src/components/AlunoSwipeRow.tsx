@@ -258,18 +258,26 @@ const AlunoSwipeRow: React.FC<AlunoSwipeRowProps> = ({
               </button>
             )}
             {podeDelegar && onDelegar && (
-              <button
-                type="button"
-                className="aluno-row-primary-action"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onDelegar();
-                }}
-              >
-                <Users size={16} />
-                Delegar contato
-              </button>
+              <>
+                {responsavelNome && (
+                  <span className="aluno-row-responsavel">
+                    <UserPlus size={13} />
+                    {responsavelNome}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="aluno-row-primary-action"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelegar();
+                  }}
+                >
+                  <Users size={16} />
+                  {responsavelNome ? "Reatribuir" : "Delegar contato"}
+                </button>
+              </>
             )}
             {!podeAssumir && !podeDelegar && responsavelNome && (
               <span className="aluno-row-responsavel">

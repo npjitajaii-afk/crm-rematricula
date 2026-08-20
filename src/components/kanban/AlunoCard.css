@@ -175,6 +175,20 @@
   margin-bottom: 0;
 }
 
+.lead-responsavel-linha {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.lead-responsavel-linha svg {
+  color: var(--gray-400);
+  flex-shrink: 0;
+}
+
 .lead-assumir-btn:hover {
   background-color: var(--primary);
   color: white;
@@ -286,4 +300,10 @@
   .lead-info {
     font-size: 0.6875rem;
   }
+}
+
+.lead-assumir-btn--sm {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  gap: 0.25rem;
 }

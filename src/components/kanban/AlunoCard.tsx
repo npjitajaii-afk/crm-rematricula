@@ -131,10 +131,6 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
         </span>
       ))}
 
-      <span className={`lead-responsavel-badge ${responsavelNome ? "" : "lead-responsavel-badge--vazio"}`}>
-        {responsavelNome ? `Responsável: ${responsavelNome}` : "Sem responsável"}
-      </span>
-
       {tipoAluno && (
         <span
           className="lead-tipo-badge"
@@ -145,6 +141,7 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
       )}
 
       <div className="lead-card-body">
+
         {resumoWhatsapp && <WhatsappBadge resumo={resumoWhatsapp} />}
 
         {itensChecklist && itensChecklist.length > 0 && (
@@ -192,28 +189,43 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
         )}
       </div>
 
-      {semResponsavel && (
-        <div className="lead-card-actions" onPointerDown={(event) => event.stopPropagation()}>
-          {isAdmin ? (
+      <div className="lead-card-actions" onPointerDown={(event) => event.stopPropagation()}>
+        {isAdmin ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            {responsavelNome ? (
+              <span className="lead-responsavel-linha">
+                <UserPlus size={12} />
+                {responsavelNome}
+              </span>
+            ) : (
+              <span className="lead-responsavel-linha" style={{ fontStyle: "italic", opacity: 0.5 }}>
+                Sem responsável
+              </span>
+            )}
             <button
               type="button"
-              className="lead-assumir-btn"
+              className="lead-assumir-btn lead-assumir-btn--sm"
               onClick={(event) => {
                 event.stopPropagation();
                 setDelegando(true);
               }}
             >
-              <Users size={14} />
-              Delegar contato
+              <Users size={13} />
+              {semResponsavel ? "Delegar" : "Reatribuir"}
             </button>
-          ) : (
-            <button type="button" className="lead-assumir-btn" onClick={handleAssumir}>
-              <UserPlus size={14} />
-              Assumir contato
-            </button>
-          )}
-        </div>
-      )}
+          </div>
+        ) : semResponsavel ? (
+          <button type="button" className="lead-assumir-btn" onClick={handleAssumir}>
+            <UserPlus size={14} />
+            Assumir contato
+          </button>
+        ) : (
+          <span className="lead-responsavel-linha">
+            <UserPlus size={12} />
+            {responsavelNome}
+          </span>
+        )}
+      </div>
 
       <div className="lead-card-footer">
         <div className="lead-meta">

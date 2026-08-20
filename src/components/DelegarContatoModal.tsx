@@ -59,14 +59,14 @@ const DelegarContatoModal: React.FC<DelegarContatoModalProps> = ({ aluno, onClos
         aria-labelledby="delegar-contato-titulo"
       >
         <div className="delegar-contato-header">
-          <h2 id="delegar-contato-titulo"><Users size={19} /> Delegar contato</h2>
+          <h2 id="delegar-contato-titulo"><Users size={19} /> {aluno.assignedTo ? "Reatribuir contato" : "Delegar contato"}</h2>
           <button type="button" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
         </div>
-        <p>Escolha quem será responsável por <strong>{aluno.name}</strong>.</p>
+        <p>{aluno.assignedTo ? "Altere o responsável por" : "Escolha quem será responsável por"} <strong>{aluno.name}</strong>.</p>
         <label>
           Colaborador
           <select value={colaboradorId} onChange={(event) => setColaboradorId(event.target.value)} required>
-            <option value="" disabled>Selecione um colaborador</option>
+            <option value="" disabled>{aluno.assignedTo ? "Selecione outro colaborador" : "Selecione um colaborador"}</option>
             {responsaveis.map((colaborador) => (
               <option key={colaborador.id} value={colaborador.id}>
                 {colaborador.name}{colaborador.id === user?.id ? " (você)" : ""}
@@ -77,7 +77,7 @@ const DelegarContatoModal: React.FC<DelegarContatoModalProps> = ({ aluno, onClos
         <div className="delegar-contato-acoes">
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn btn-primary" disabled={salvando || !colaboradorId}>
-            {salvando ? "Delegando..." : "Delegar"}
+            {salvando ? "Salvando..." : aluno.assignedTo ? "Reatribuir" : "Delegar"}
           </button>
         </div>
       </form>
