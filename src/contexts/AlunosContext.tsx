@@ -96,7 +96,11 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
           }
         }
 
-        if (isAdmin) {
+        // Todos os usuários (admin e colaboradores) precisam da lista de
+        // colaboradores para exibir o nome do responsável em cada contato.
+        // A restrição de ATRIBUIÇÃO continua sendo feita na UI (podeDelegar)
+        // e no backend — aqui é só leitura para montar os labels.
+        {
           const { colaboradores: fetchedColaboradores, error: colaboradoresError } =
             await getColaboradoresService();
           if (!cancelado) {
