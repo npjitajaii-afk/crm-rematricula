@@ -10,6 +10,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  Link2,
 } from "lucide-react";
 import { formatCurrency, formatDate, getStatusColor } from "../utils/formatters";
 
@@ -202,6 +203,15 @@ const AlunoSwipeRow: React.FC<AlunoSwipeRowProps> = ({
             <div className="aluno-row-main">
               <strong className="aluno-row-name">{aluno.name}</strong>
               {aluno.ra && <span className="aluno-row-ra">RA: {aluno.ra}</span>}
+              {aluno.matriculaVinculadaId && (
+                <span
+                  className="aluno-row-vinculo-badge"
+                  title="Este aluno tem outra matrícula vinculada (outro curso/área)"
+                >
+                  <Link2 size={12} />
+                  Matrícula vinculada
+                </span>
+              )}
             </div>
 
             {aluno.curso && (

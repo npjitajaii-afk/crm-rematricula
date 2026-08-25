@@ -133,6 +133,22 @@
   color: var(--text-secondary);
 }
 
+.aluno-row-vinculo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: fit-content;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+  background-color: #e6f7f7;
+  border: 1px solid var(--primary-light);
+  padding: 0.125rem 0.4375rem;
+  border-radius: var(--radius-sm);
+  margin-top: 0.25rem;
+  white-space: nowrap;
+}
+
 .aluno-row-field {
   display: flex;
   align-items: center;
