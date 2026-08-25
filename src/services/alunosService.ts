@@ -46,6 +46,7 @@ function mapDatabaseToAluno(data: any): Aluno {
     observations: data.observacoes || undefined,
     tags: data.tags || [],
     assignedTo: data.responsavel_id || undefined,
+    matriculaVinculadaId: data.matricula_vinculada_id || undefined,
     createdBy: data.criado_por,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
@@ -242,22 +243,9 @@ export async function verificarAlunoDuplicado(
     }
   }
 
-  const nomeNormalizado = normalizarNome(dados.nome);
-  const telefoneNormalizado = normalizarTelefone(dados.telefone);
-  if (nomeNormalizado && telefoneNormalizado) {
-    let query = supabase
-      .from('alunos')
-      .select('id, nome, area')
-      .eq('nome_normalizado', nomeNormalizado)
-      .eq('telefone_normalizado', telefoneNormalizado)
-      .limit(1);
-    if (excludeId) query = query.neq('id', excludeId);
-    const { data } = await query;
-    if (data && data[0]) {
-      return { id: data[0].id, nome: data[0].nome, area: data[0].area, motivo: 'nome_telefone' };
-    }
-  }
-
+  // Checagem por nome+telefone REMOVIDA intencionalmente:
+  // alunos com duas matrículas têm mesmo nome e telefone mas RAs diferentes.
+  // Somente o RA é critério de duplicidade.
   return null;
 }
 
@@ -728,5 +716,114 @@ export async function updateAlunoStatus(
     return { error: null };
   } catch {
     return { error: 'Erro ao atualizar status' };
+  }
+}
+
+/**
+ * Cria uma matrícula vinculada a um aluno existente (mesmo aluno, outro curso/RA).
+ */
+export async function criarMatriculaVinculada(
+  origemId: string,
+  dados: {
+    ra?: string;
+    curso?: string;
+    turno?: string;
+    area: Aluno['area'];
+    status: AlunoStatus;
+    source: CanalContato;
+    observations?: string;
+    tags?: string[];
+    createdBy: string;
+  }
+): Promise<AlunoResponse> {
+  try {
+    // Busca o aluno de origem para copiar nome, telefone, email etc.
+    const { aluno: origem, error: erroOrigem } = await getAlunoById(origemId);
+    if (erroOrigem || !origem) {
+      return { aluno: null, error: erroOrigem || 'Aluno de origem não encontrado' };
+    }
+
+    // Verifica se o RA da nova matrícula já existe
+    if (dados.ra) {
+      const raNormalizado = dados.ra.trim().toUpperCase();
+      const { data: existente } = await supabase
+        .from('alunos')
+        .select('id')
+        .eq('ra_normalizado', raNormalizado)
+        .limit(1);
+      if (existente && existente[0]) {
+        return { aluno: null, error: 'Já existe um contato com este RA cadastrado no CRM.' };
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('alunos')
+      .insert([{
+        nome: origem.name,
+        email: origem.email,
+        telefone: origem.phone,
+        ra: dados.ra || null,
+        curso: dados.curso || null,
+        turno: dados.turno || null,
+        area: dados.area,
+        status: dados.status,
+        canal_contato: dados.source,
+        observacoes: dados.observations || null,
+        tags: dados.tags || [],
+        responsavel_id: origem.assignedTo || null,
+        criado_por: dados.createdBy,
+        matricula_vinculada_id: origemId,
+      }])
+      .select(SELECT_WITH_INTERACOES)
+      .single();
+
+    if (error) {
+      console.error('Error creating matricula vinculada:', error);
+      return { aluno: null, error: error.message };
+    }
+
+    // Atualiza o aluno de origem com o id da nova matrícula
+    await supabase
+      .from('alunos')
+      .update({ matricula_vinculada_id: data.id })
+      .eq('id', origemId);
+
+    return { aluno: data ? mapDatabaseToAluno(data) : null, error: null };
+  } catch {
+    return { aluno: null, error: 'Erro ao criar matrícula vinculada' };
+  }
+}
+
+/**
+ * Remove o vínculo entre duas matrículas do mesmo aluno.
+ */
+export async function desvincularMatricula(
+  alunoId: string
+): Promise<{ error: string | null }> {
+  try {
+    // Busca o parceiro vinculado antes de desvincular
+    const { data: aluno } = await supabase
+      .from('alunos')
+      .select('matricula_vinculada_id')
+      .eq('id', alunoId)
+      .single();
+
+    const parceiroId = aluno?.matricula_vinculada_id;
+
+    // Remove o vínculo dos dois lados
+    const ids = [alunoId, ...(parceiroId ? [parceiroId] : [])];
+    const { error } = await supabase
+      .from('alunos')
+      .update({ matricula_vinculada_id: null })
+      .in('id', ids);
+
+    if (error) {
+      console.error('Error desvincular matricula:', error);
+      return { error: error.message };
+    }
+
+    return { error: null };
+  } catch {
+    return { error: 'Erro ao desvincular matrícula' };
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, ReactNode } from "react";
-import { Aluno, AlunoFilters, Interacao, PipelineStatusResumo } from "../types";
+import { Aluno, AlunoFilters, Interacao, PipelineStatusResumo, Area, AlunoStatus, CanalContato } from "../types";
 import {
   getAlunos,
   getAlunoById,
@@ -10,6 +10,8 @@ import {
   deleteAlunosBulk as deleteAlunosBulkService,
   assumirAluno as assumirAlunoService,
   delegarAluno as delegarAlunoService,
+  criarMatriculaVinculada as criarMatriculaVinculadaService,
+  desvincularMatricula as desvincularMatriculaService,
   getPipelineResumo,
   getColaboradores as getColaboradoresService,
   addInteraction as addInteractionService,
@@ -96,10 +98,9 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
           }
         }
 
-        // Todos os usuários (admin e colaboradores) precisam da lista de
-        // colaboradores para exibir o nome do responsável em cada contato.
-        // A restrição de ATRIBUIÇÃO continua sendo feita na UI (podeDelegar)
-        // e no backend — aqui é só leitura para montar os labels.
+        // Todos os usuários precisam da lista de colaboradores para exibir
+        // o nome do responsável em cada contato. A restrição de ATRIBUIÇÃO
+        // continua na UI (podeDelegar) e no banco — aqui é só leitura.
         {
           const { colaboradores: fetchedColaboradores, error: colaboradoresError } =
             await getColaboradoresService();
@@ -233,6 +234,67 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     },
     []
   );
+
+  const criarMatriculaVinculada = useCallback(
+    async (
+      origemId: string,
+      dados: {
+        ra?: string;
+        curso?: string;
+        turno?: string;
+        area: Area;
+        status: AlunoStatus;
+        source: CanalContato;
+        observations?: string;
+        tags?: string[];
+      }
+    ) => {
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { aluno, error } = await criarMatriculaVinculadaService(origemId, {
+        ...dados,
+        createdBy: user.id,
+      });
+
+      if (error) {
+        console.error("Erro ao criar matrícula vinculada:", error);
+        throw new Error(error);
+      }
+
+      if (aluno) {
+        // A nova matrícula entra na lista, e a de origem precisa refletir
+        // localmente o vínculo recém-criado (o trigger do banco já
+        // espelhou isso do lado dele, mas o estado local do React não
+        // sabe disso sozinho).
+        setAlunos((prev) => [
+          aluno,
+          ...prev.map((a) =>
+            a.id === origemId ? { ...a, matriculaVinculadaId: aluno.id } : a
+          ),
+        ]);
+      }
+    },
+    [user]
+  );
+
+  const desvincularMatricula = useCallback(async (alunoId: string) => {
+    const alunoAtual = alunos.find((a) => a.id === alunoId);
+    const parceiroId = alunoAtual?.matriculaVinculadaId;
+
+    const { error } = await desvincularMatriculaService(alunoId);
+    if (error) {
+      console.error("Erro ao desvincular matrícula:", error);
+      throw new Error(error);
+    }
+
+    setAlunos((prev) =>
+      prev.map((a) =>
+        a.id === alunoId || (parceiroId && a.id === parceiroId)
+          ? { ...a, matriculaVinculadaId: undefined }
+          : a
+      )
+    );
+  }, [alunos]);
 
   // Otimização 5.3: em vez de recarregar TODOS os alunos após adicionar
   // uma interação, buscamos apenas o aluno afetado e atualizamos ele
@@ -628,6 +690,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       deleteAlunosBulk,
       assumirAluno,
       delegarAluno,
+      criarMatriculaVinculada,
+      desvincularMatricula,
       addInteraction,
       getAluno,
       filteredAlunos,
@@ -649,6 +713,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       deleteAlunosBulk,
       assumirAluno,
       delegarAluno,
+      criarMatriculaVinculada,
+      desvincularMatricula,
       addInteraction,
       getAluno,
       filteredAlunos,

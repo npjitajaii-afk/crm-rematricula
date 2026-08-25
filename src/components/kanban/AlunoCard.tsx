@@ -9,6 +9,7 @@ import {
   UserPlus,
   Users,
   CalendarClock,
+  Plus,
 } from "lucide-react";
 import {
   formatCurrency,
@@ -26,6 +27,7 @@ import EngajamentoChecklist from "./EngajamentoChecklist";
 import WhatsappBadge from "./WhatsappBadge";
 import AlunoExpandModal from "../AlunoExpandModal";
 import DelegarContatoModal from "../DelegarContatoModal";
+import NovaMatriculaModal from "../NovaMatriculaModal";
 import "./AlunoCard.css";
 
 interface AlunoCardProps {
@@ -45,11 +47,15 @@ interface AlunoCardProps {
 // estado por card (ex: contexto por aluno ou uma lib tipo React Query) —
 // fica registrado como possível próximo passo, fora do escopo deste bloco.
 const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
-  const { isAdmin, assumirAluno, colaboradores } = useAlunos();
+  const { isAdmin, assumirAluno, colaboradores, getAluno } = useAlunos();
   // Ao clicar no card, expande um painel por cima da tela (ver
-  // AlunoExpandModal.tsx) em vez de navegar pra /alunos/:id.
-  const [expandido, setExpandido] = useState(false);
+  // AlunoExpandModal.tsx) em vez de navegar pra /alunos/:id. Guarda o id
+  // do aluno expandido (não necessariamente este — ao clicar na aba da
+  // matrícula vinculada, o modal troca pra ela sem precisar fechar e
+  // reabrir).
+  const [expandedAlunoId, setExpandedAlunoId] = useState<string | null>(null);
   const [delegando, setDelegando] = useState(false);
+  const [criandoVinculada, setCriandoVinculada] = useState(false);
   const { showToast } = useToast();
   const { itensPorAluno } = useChecklist();
   const { resumoPorAluno } = useWhatsapp();
@@ -62,7 +68,7 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   // Resumo de WhatsApp vale pra qualquer área — a mensagem chega pelo
   // telefone, independente do funil em que o aluno está.
   const resumoWhatsapp = resumoPorAluno[aluno.id];
-  // Um alerta sÃ³ aparece no dia agendado e para o dono do compromisso.
+  // Um alerta só aparece no dia agendado e para o dono do compromisso.
   const compromissosHoje = compromissos.filter(
     (item) => item.alunoId === aluno.id && item.userId === user?.id && isSameDay(item.data, startOfToday())
   );
@@ -79,8 +85,14 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   const responsavelNome = colaboradores.find((c) => c.id === aluno.assignedTo)?.name;
 
   const handleClick = () => {
-    setExpandido(true);
+    setExpandedAlunoId(aluno.id);
   };
+
+  // Matrícula "irmã" — mesmo aluno, curso/edital diferente. Quando existe,
+  // mostramos as duas como abas lado a lado dentro do mesmo card.
+  const alunoVinculado = aluno.matriculaVinculadaId
+    ? getAluno(aluno.matriculaVinculadaId)
+    : undefined;
 
   const handleAssumir = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -101,14 +113,50 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
     <div
       className="lead-card"
       onClick={handleClick}
-      onPointerDown={expandido ? (e) => e.stopPropagation() : undefined}
+      onPointerDown={expandedAlunoId ? (e) => e.stopPropagation() : undefined}
     >
       <div className="lead-card-header">
         <h4 className="lead-name">{aluno.name}</h4>
+        {!aluno.matriculaVinculadaId && (
+          <button
+            type="button"
+            className="lead-nova-matricula-btn"
+            title="Adicionar nova matrícula vinculada (mesmo aluno, outro curso)"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCriandoVinculada(true);
+            }}
+          >
+            <Plus size={14} />
+          </button>
+        )}
         {!!aluno.value && (
           <span className="lead-value">{formatCurrency(aluno.value)}</span>
         )}
       </div>
+
+      {aluno.matriculaVinculadaId && (
+        <div
+          className="lead-matriculas-tabs"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="lead-matricula-tab lead-matricula-tab--ativa" title="Matrícula deste card">
+            {aluno.curso || "Esta matrícula"}
+          </span>
+          <button
+            type="button"
+            className="lead-matricula-tab lead-matricula-tab--outra"
+            title="Abrir a outra matrícula deste aluno"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpandedAlunoId(aluno.matriculaVinculadaId!);
+            }}
+          >
+            {alunoVinculado?.curso || "Outra matrícula"}
+          </button>
+        </div>
+      )}
 
       {alerta && (
         <span
@@ -243,14 +291,18 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
         )}
       </div>
 
-      {expandido && (
+      {expandedAlunoId && (
         <AlunoExpandModal
-          alunoId={aluno.id}
-          onClose={() => setExpandido(false)}
+          alunoId={expandedAlunoId}
+          onClose={() => setExpandedAlunoId(null)}
+          onOpenVinculada={(id) => setExpandedAlunoId(id)}
         />
       )}
       {delegando && (
         <DelegarContatoModal aluno={aluno} onClose={() => setDelegando(false)} />
+      )}
+      {criandoVinculada && (
+        <NovaMatriculaModal aluno={aluno} onClose={() => setCriandoVinculada(false)} />
       )}
     </div>
   );

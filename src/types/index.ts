@@ -93,6 +93,8 @@ export interface Aluno {
   interactions: Interacao[];
   assignedTo?: string;
   createdBy: string;
+  /** ID da matrícula vinculada — mesmo aluno, outro curso/edital. */
+  matriculaVinculadaId?: string;
 }
 
 export interface AlunoFilters {
@@ -160,10 +162,6 @@ export interface AlunoRisco {
 }
 
 // ---- Checklist de Engajamento ----
-// Tarefas fixas criadas automaticamente (via trigger no banco, ver
-// database/009_checklist_engajamento.sql) para todo aluno que entra na
-// área "engajamento". O colaborador vai marcando conforme confirma cada
-// etapa de ambientação do calouro.
 export type ChecklistItemKey =
   | "login_leo_app"
   | "acessou_teams"
@@ -186,15 +184,12 @@ export interface ChecklistItem {
 }
 
 export interface ChecklistContextType {
-  /** Itens de checklist agrupados por alunoId (só existe para alunos da área "engajamento"). */
   itensPorAluno: Record<string, ChecklistItem[]>;
   isLoading: boolean;
-toggleItem: (item: ChecklistItem, concluido: boolean) => Promise<void>;
+  toggleItem: (item: ChecklistItem, concluido: boolean) => Promise<void>;
 }
+
 // ---- Tarefas pessoais (Engajamento) ----
-// Tarefas criadas pelo colaborador na aba "Tarefas" do funil de Engajamento.
-// Só o dono vê as suas; admin vê todas. Podem ter data, aluno vinculado,
-// anotações e checklist interno.
 export type TarefaPessoalStatus = "em_andamento" | "concluido";
 export interface TarefaChecklistItem {
   id: string;
@@ -260,6 +255,7 @@ export interface AgendaEngajamentoContextType {
   criarCompromisso: (dados: { alunoId: string; data: Date; ticket?: string; comentario: string }) => Promise<void>;
   excluirCompromisso: (id: string) => Promise<void>;
 }
+
 // ---- Mensagens de WhatsApp (Evolution API) ----
 export type WhatsappDirecao = "recebida" | "enviada";
 
@@ -282,7 +278,6 @@ export interface WhatsappResumo {
 }
 
 export interface WhatsappContextType {
-  /** Resumo (não lidas + última mensagem) por alunoId, para o badge no card. */
   resumoPorAluno: Record<string, WhatsappResumo>;
   isLoading: boolean;
   marcarComoLida: (alunoId: string) => Promise<void>;
@@ -383,6 +378,20 @@ export interface AlunosContextType {
   deleteAlunosBulk: (ids: string[]) => Promise<number>;
   assumirAluno: (id: string) => Promise<void>;
   delegarAluno: (id: string, colaboradorId: string) => Promise<void>;
+  criarMatriculaVinculada: (
+    origemId: string,
+    dados: {
+      ra?: string;
+      curso?: string;
+      turno?: string;
+      area: Area;
+      status: AlunoStatus;
+      source: CanalContato;
+      observations?: string;
+      tags?: string[];
+    }
+  ) => Promise<void>;
+  desvincularMatricula: (alunoId: string) => Promise<void>;
   addInteraction: (
     alunoId: string,
     interaction: Omit<Interacao, "id" | "alunoId">

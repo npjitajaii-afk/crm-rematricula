@@ -472,6 +472,7 @@ const Alunos: React.FC = () => {
         <AlunoExpandModal
           alunoId={expandedAlunoId}
           onClose={() => setExpandedAlunoId(null)}
+          onOpenVinculada={(id) => setExpandedAlunoId(id)}
         />
       )}
       {delegarAlunoId && (() => {

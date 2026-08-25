@@ -13,15 +13,19 @@ import {
   Users,
   Trash2,
   MessageSquare,
+  Plus,
+  Link2,
 } from "lucide-react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useChecklist } from "../hooks/useChecklist";
 import { useToast } from "../hooks/useToast";
 import { AlunoStatus } from "../types";
+import { getAlunoById } from "../services/alunosService";
 import { AREA_CONFIG } from "../config/areas";
 import { TAGS_SELECIONAVEIS_POR_AREA, TAGS_DISPONIVEIS } from "../utils/tags";
 import { getStatusColor, getStatusLabel } from "../utils/formatters";
+import NovaMatriculaModal from "./NovaMatriculaModal";
 import "../pages/AlunoDetails.css";
 import "../pages/AlunoForm.css";
 import "./AlunoExpandModal.css";
@@ -40,6 +44,11 @@ interface AlunoExpandModalProps {
    * mudança de status/tag feita aqui mesmo dentro do modal. */
   alunoId: string;
   onClose: () => void;
+  /** Chamado quando o usuário clica na aba da matrícula vinculada — quem
+   * abriu este modal decide o que fazer (normalmente troca o alunoId
+   * exibido, sem fechar e reabrir o overlay). Opcional: se omitido, a
+   * aba da matrícula vinculada não é exibida aqui. */
+  onOpenVinculada?: (id: string) => void;
 }
 
 // Painel "expandido" do card do aluno: abre por cima da tela (Kanban ou
@@ -50,14 +59,23 @@ interface AlunoExpandModalProps {
 const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   alunoId,
   onClose,
+  onOpenVinculada,
 }) => {
   const { getAluno, updateAluno, colaboradores, isAdmin } = useAlunos();
+  const [criandoVinculada, setCriandoVinculada] = useState(false);
   const { itensPorAluno, toggleItem, isLoading: checklistCarregando } =
     useChecklist();
   const { showToast } = useToast();
 
   const { user } = useAuth();
   const [aluno, setAluno] = useState(getAluno(alunoId));
+  // Quando o card clicado é o de uma matrícula vinculada (outra área/funil),
+  // ela pode ainda não estar carregada na lista `alunos` do contexto (a
+  // busca prioriza a área da rota atual — ver AlunosContext.tsx). Sem isso,
+  // o modal simplesmente não abria: `aluno` ficava undefined e o componente
+  // retornava null, dando a impressão de que o clique não fazia nada.
+  const [buscandoVinculada, setBuscandoVinculada] = useState(false);
+  const [naoEncontrado, setNaoEncontrado] = useState(false);
   const [novaAnotacao, setNovaAnotacao] = useState("");
   const [salvandoObs, setSalvandoObs] = useState(false);
   // Anotações e Tarefas dividem a coluna do meio em abas — só uma fica
@@ -81,9 +99,40 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   };
 
   // Re-sincroniza o aluno local sempre que o contexto atualizar o registro.
+  // Se o id não estiver na lista já carregada (caso da matrícula vinculada
+  // de outra área que ainda não chegou), busca direto pelo id no banco em
+  // vez de deixar o modal em branco.
   useEffect(() => {
+    let cancelado = false;
+    setNaoEncontrado(false);
+
     const atual = getAluno(alunoId);
-    setAluno(atual);
+    if (atual) {
+      setAluno(atual);
+      return;
+    }
+
+    setAluno(undefined);
+    setBuscandoVinculada(true);
+    getAlunoById(alunoId)
+      .then(({ aluno: encontrado }) => {
+        if (cancelado) return;
+        if (encontrado) {
+          setAluno(encontrado);
+        } else {
+          setNaoEncontrado(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelado) setNaoEncontrado(true);
+      })
+      .finally(() => {
+        if (!cancelado) setBuscandoVinculada(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
   }, [alunoId, getAluno]);
 
   // Fecha com Esc.
@@ -100,7 +149,44 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
     if (atual) setAluno(atual);
   };
 
-  if (!aluno) return null;
+  if (!aluno) {
+    // Ainda buscando a matrícula vinculada (ou ela não existe mais) — sem
+    // isso o overlay nem aparecia e o clique parecia não fazer nada.
+    if (buscandoVinculada || !naoEncontrado) {
+      return createPortal(
+        <div
+          className="aluno-expand-overlay"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
+          <div className="aluno-expand-modal aluno-expand-modal--carregando">
+            <p>Carregando matrícula vinculada…</p>
+          </div>
+        </div>,
+        document.body
+      );
+    }
+
+    return createPortal(
+      <div
+        className="aluno-expand-overlay"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div className="aluno-expand-modal aluno-expand-modal--carregando">
+          <p>Não foi possível carregar essa matrícula.</p>
+          <button type="button" className="aluno-expand-close" onClick={onClose}>
+            Fechar
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   const config = AREA_CONFIG[aluno.area];
   const tagsSelecionaveis =
@@ -194,6 +280,16 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
             >
               {getStatusLabel(aluno.status)}
             </span>
+            {!aluno.matriculaVinculadaId && (
+              <button
+                type="button"
+                className="aluno-expand-nova-matricula-btn"
+                title="Adicionar nova matrícula vinculada (mesmo aluno, outro curso)"
+                onClick={() => setCriandoVinculada(true)}
+              >
+                <Plus size={16} />
+              </button>
+            )}
           </div>
           <button
             className="aluno-expand-close"
@@ -203,6 +299,30 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
             <X size={20} />
           </button>
         </div>
+
+        {aluno.matriculaVinculadaId && (
+          <div className="aluno-expand-matriculas-tabs">
+            <span className="aluno-expand-matricula-tab aluno-expand-matricula-tab--ativa">
+              <Link2 size={12} />
+              {aluno.curso || "Esta matrícula"} · {AREA_CONFIG[aluno.area].label}
+            </span>
+            {(() => {
+              const vinculado = getAluno(aluno.matriculaVinculadaId);
+              return (
+                <button
+                  type="button"
+                  className="aluno-expand-matricula-tab aluno-expand-matricula-tab--outra"
+                  onClick={() => onOpenVinculada?.(aluno.matriculaVinculadaId!)}
+                  disabled={!onOpenVinculada}
+                  title="Abrir a outra matrícula deste aluno"
+                >
+                  <Link2 size={12} />
+                  {vinculado ? `${vinculado.curso || "Outro curso"} · ${AREA_CONFIG[vinculado.area].label}` : "Outra matrícula"}
+                </button>
+              );
+            })()}
+          </div>
+        )}
 
         <div className="aluno-expand-columns">
           {/* Coluna esquerda: dados de contato */}
@@ -469,6 +589,9 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
           </div>
         </div>
       </div>
+      {criandoVinculada && (
+        <NovaMatriculaModal aluno={aluno} onClose={() => setCriandoVinculada(false)} />
+      )}
     </div>,
     document.body
   );
