@@ -1,19 +1,19 @@
 :root {
-  /* Cores da marca (Uniasselvi) */
-  --primary: #00A9AA;
-  --primary-dark: #067A7B;
-  --primary-light: #4DBDBD;
+  /* Cores da marca (Bask CRM) — inspiradas na tela de login, em tom suave */
+  --primary: #4C5FC7;
+  --primary-dark: #37409C;
+  --primary-light: #8B95E3;
 
-  --secondary: #FFD600;
-  --secondary-dark: #E0B400;
+  --secondary: #C1729F;
+  --secondary-dark: #9E567F;
 
   --ink: #282828;
   --ink-light: #454545;
 
   --success: #22c55e;
-  --warning: #FFD600;
+  --warning: #F2A93B;
   --danger: #ef4444;
-  --info: #00A9AA;
+  --info: #4C5FC7;
   
   /* Cores neutras */
   --gray-50: #f9fafb;

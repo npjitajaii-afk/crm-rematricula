@@ -18,6 +18,13 @@ import {
 } from "../services/alunosService";
 import { useAuth } from "../hooks/useAuth";
 import { AlunosContext } from "./alunos-context";
+import {
+  normalizeRow,
+  normalizeHeader,
+  pickFields,
+  findHeaderRowIndex,
+  FieldSpec,
+} from "../utils/planilhaImport";
 
 interface AlunosProviderProps {
   children: ReactNode;
@@ -380,30 +387,108 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   }, [alunos, filters]);
 
   /**
-   * Normaliza as chaves de uma linha da planilha (remove acentos, espaços e
-   * deixa tudo em maiúsculas) para permitir casar com múltiplos formatos de
-   * cabeçalho, ex: "NOME_ALUNO", "Nome Aluno", "nome" etc.
+   * Specs de casamento de coluna pra planilha de Rematrícula. A ordem
+   * importa: campos mais "específicos" (RA, curso, turno, status do
+   * aluno) vêm antes de "nome" pra garantir que colunas como
+   * "NOME_CURSO" sejam capturadas pelo campo certo antes de qualquer
+   * tentativa aproximada de achar o nome do aluno. Ver
+   * src/utils/planilhaImport.ts para o algoritmo de casamento.
    */
-  const normalizeRow = (row: Record<string, unknown>): Record<string, string> => {
-    const normalized: Record<string, string> = {};
-    Object.entries(row).forEach(([key, value]) => {
-      const normalizedKey = key
-        .trim()
-        .toUpperCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, "_");
-      normalized[normalizedKey] = value != null ? String(value).trim() : "";
-    });
-    return normalized;
-  };
+  const REMATRICULA_FIELD_SPECS: FieldSpec[] = [
+    {
+      field: "email",
+      aliases: ["EMAIL", "E_MAIL", "EMAIL_ALUNO", "ENDERECO_DE_EMAIL"],
+      keywords: ["EMAIL"],
+    },
+    {
+      field: "telefone",
+      aliases: [
+        "FONE", "TELEFONE", "PHONE", "CELULAR", "WHATSAPP", "WHATS",
+        "TELEFONE_CELULAR", "TELEFONE_CONTATO", "NUMERO", "CONTATO_TELEFONE",
+      ],
+      keywords: ["FONE", "TELEFONE", "CELULAR", "WHATSAPP", "WHATS"],
+    },
+    {
+      field: "codigoAluno",
+      aliases: [
+        "CODIGO_ALUNO", "RA", "MATRICULA", "NUMERO_MATRICULA", "COD_ALUNO",
+        "REGISTRO_ACADEMICO", "CODIGO_MATRICULA", "N_MATRICULA",
+      ],
+      keywords: ["MATRICULA", "REGISTRO"],
+      exclude: ["DATA", "STATUS", "SITUACAO"],
+    },
+    {
+      field: "curso",
+      aliases: ["NOME_CURSO", "CURSO", "CURSO_ALUNO", "NOME_DO_CURSO"],
+      keywords: ["CURSO"],
+    },
+    {
+      field: "turno",
+      aliases: ["TURNO"],
+      keywords: ["TURNO"],
+    },
+    {
+      field: "tipoAluno",
+      aliases: ["TIPO", "TIPO_ALUNO", "TIPO_DE_ALUNO", "PERFIL_ALUNO"],
+      keywords: ["TIPO", "PERFIL"],
+      exclude: ["ENTRADA", "CONTATO", "CURSO"],
+    },
+    {
+      field: "statusAluno",
+      aliases: ["STATUS_ALUNO", "SITUACAO_CADASTRO", "SITUACAO_ALUNO"],
+      keywords: ["CADASTRO"],
+      exclude: ["RENOVACAO", "MATRICULA", "CURSO"],
+    },
+    {
+      field: "statusRenovacao",
+      aliases: ["STATUS", "SITUACAO", "SITUACAO_RENOVACAO", "STATUS_RENOVACAO"],
+      keywords: ["STATUS", "SITUACAO"],
+    },
+    {
+      field: "tagsPlanilha",
+      aliases: ["TAGS", "ETIQUETAS", "ETIQUETA"],
+      keywords: ["TAGS", "ETIQUETA", "ETIQUETAS"],
+    },
+    {
+      field: "observacoesPlanilha",
+      aliases: ["OBSERVACOES", "OBSERVATIONS", "OBS", "COMENTARIOS", "ANOTACOES"],
+      keywords: ["OBSERVACAO", "OBSERVACOES", "OBS", "COMENTARIO", "ANOTACAO"],
+    },
+    {
+      field: "canal",
+      aliases: [
+        "CANAL", "CANAL_CONTATO", "ORIGEM", "FONTE", "CANAL_DE_CONTATO",
+        "CANAL_DA_MATRICULA",
+      ],
+      keywords: ["CANAL", "ORIGEM", "FONTE"],
+    },
+    {
+      field: "valor",
+      aliases: [
+        "VALOR", "VALOR_PENDENTE", "MENSALIDADE", "VALOR_MENSALIDADE",
+        "DEBITO", "VALOR_DEBITO",
+      ],
+      keywords: ["VALOR", "MENSALIDADE", "DEBITO"],
+    },
+    {
+      // Vem por último de propósito: qualquer coluna já reivindicada pelos
+      // campos acima (ex: "NOME_CURSO" -> curso) não é candidata aqui, e o
+      // exclude cobre os casos que ainda restarem (nome de curso/mãe/pai
+      // que por acaso comece com "NOME").
+      field: "nome",
+      aliases: ["NOME_ALUNO", "NOME", "NAME", "NOME_COMPLETO", "ALUNO"],
+      keywords: ["NOME", "ALUNO"],
+      exclude: ["CURSO", "MAE", "PAI", "RESPONSAVEL", "POLO", "TURMA", "EMPRESA"],
+    },
+  ];
 
-  const pickField = (row: Record<string, string>, keys: string[]): string => {
-    for (const key of keys) {
-      if (row[key]) return row[key];
-    }
-    return "";
-  };
+  const REMATRICULA_HEADER_KEYWORDS = [
+    ["NOME", "ALUNO", "NOME_ALUNO"],
+    ["EMAIL", "E_MAIL"],
+    ["FONE", "TELEFONE", "CELULAR"],
+    ["CURSO"],
+    ["RA", "MATRICULA"],
+  ];
 
   /**
    * Converte uma linha já normalizada da planilha nos dados de um aluno.
@@ -414,36 +499,34 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     userId: string
   ): Omit<Aluno, "id" | "createdAt" | "updatedAt" | "interactions"> | null => {
     const r = normalizeRow(rawRow as Record<string, unknown>);
+    const campos = pickFields(r, REMATRICULA_FIELD_SPECS);
 
-    // Planilha de rematrícula (ex: CODIGO_ALUNO, NOME_ALUNO, FONE, EMAIL,
-    // STATUS, STATUS_ALUNO, TIPO, NOME_CURSO), com fallback pros nomes
-    // genéricos usados no template de exportação/importação antigo.
-    const nome = pickField(r, ["NOME_ALUNO", "NOME", "NAME"]);
-    const email = pickField(r, ["EMAIL"]);
-    const telefone = pickField(r, ["FONE", "TELEFONE", "PHONE"]);
+    const nome = campos.nome || "";
+    const email = campos.email || "";
+    const telefone = campos.telefone || "";
 
     // Linha vazia ou sem nenhum dado útil: ignora em vez de mandar pro banco.
     if (!nome && !email && !telefone) return null;
 
-    const codigoAluno = pickField(r, ["CODIGO_ALUNO", "RA", "MATRICULA"]);
-    const curso = pickField(r, ["NOME_CURSO", "CURSO"]);
-    const turno = pickField(r, ["TURNO"]);
+    const codigoAluno = campos.codigoAluno || "";
+    const curso = campos.curso || "";
+    const turno = campos.turno || "";
 
     // Campos específicos da planilha de rematrícula: viram tags no card
     // (ex: "Veterano", "Cadastrado") e a situação de renovação vira
     // observação, já que não é um dos status do funil interno.
-    const tipoAluno = pickField(r, ["TIPO"]); // Calouro / Veterano / Winback
-    const statusAluno = pickField(r, ["STATUS_ALUNO"]); // ex: Cadastrado
-    const statusRenovacao = pickField(r, ["STATUS"]); // ex: Não Renovado
+    const tipoAluno = campos.tipoAluno || ""; // Calouro / Veterano / Winback
+    const statusAluno = campos.statusAluno || ""; // ex: Cadastrado
+    const statusRenovacao = campos.statusRenovacao || ""; // ex: Não Renovado
 
-    const tagsPlanilha = pickField(r, ["TAGS"]);
+    const tagsPlanilha = campos.tagsPlanilha || "";
     const tags = [
       tipoAluno,
       statusAluno,
       ...(tagsPlanilha ? tagsPlanilha.split(",").map((t) => t.trim()) : []),
     ].filter(Boolean);
 
-    const observacoesPlanilha = pickField(r, ["OBSERVACOES", "OBSERVATIONS"]);
+    const observacoesPlanilha = campos.observacoesPlanilha || "";
     const observations = [
       statusRenovacao ? `Situação na importação: ${statusRenovacao}` : "",
       observacoesPlanilha,
@@ -463,11 +546,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       area: "rematricula",
       status: "pendente" as Aluno["status"],
       statusAtualizadoEm: new Date(),
-      source: (pickField(r, ["CANAL", "CANAL_CONTATO", "ORIGEM"]) ||
-        "outro") as Aluno["source"],
-      value:
-        parseFloat(pickField(r, ["VALOR", "VALOR_PENDENTE"]) || "0") ||
-        undefined,
+      source: (campos.canal || "outro") as Aluno["source"],
+      value: parseFloat(campos.valor || "0") || undefined,
       observations: observations || undefined,
       tags,
       createdBy: userId,
@@ -493,7 +573,19 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
           const workbook = XLSX.read(data, { type: "binary" });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          resolve(XLSX.utils.sheet_to_json(worksheet));
+
+          // Não dá pra assumir que a linha 1 sempre é o cabeçalho — a
+          // planilha pode chegar com título, logo ou linhas em branco
+          // antes da tabela. Detecta a linha de cabeçalho de verdade
+          // procurando por colunas reconhecíveis (nome, email, etc.).
+          const rawRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+            header: 1,
+            defval: "",
+          });
+          const headerRow = findHeaderRowIndex(rawRows, REMATRICULA_HEADER_KEYWORDS, 2);
+          resolve(
+            XLSX.utils.sheet_to_json(worksheet, { range: headerRow, defval: "" })
+          );
         } catch {
           reject(new Error("Erro ao processar arquivo"));
         }
@@ -546,6 +638,76 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  const ENGAJAMENTO_FIELD_SPECS: FieldSpec[] = [
+    {
+      field: "polo",
+      aliases: ["POLO", "UNIDADE", "POLO_UNIDADE"],
+      keywords: ["POLO", "UNIDADE"],
+    },
+    {
+      field: "email",
+      aliases: ["E_MAIL", "EMAIL", "EMAIL_ALUNO"],
+      keywords: ["EMAIL"],
+    },
+    {
+      field: "phone",
+      aliases: ["CELULAR", "TELEFONE", "FONE", "PHONE", "WHATSAPP", "WHATS"],
+      keywords: ["CELULAR", "TELEFONE", "FONE", "WHATSAPP", "WHATS"],
+    },
+    {
+      field: "cpf",
+      aliases: ["CPF"],
+      keywords: ["CPF"],
+    },
+    {
+      field: "ra",
+      aliases: ["CODIGO_INSCRICAO", "RA", "MATRICULA", "NUMERO_MATRICULA"],
+      keywords: ["INSCRICAO", "MATRICULA"],
+      exclude: ["DATA", "STATUS"],
+    },
+    {
+      field: "curso",
+      aliases: ["CURSO", "NOME_CURSO", "CURSO_ALUNO"],
+      keywords: ["CURSO"],
+    },
+    {
+      field: "tipoEntrada",
+      aliases: ["TIPO_DE_ENTRADA", "TIPO_ENTRADA", "TIPO"],
+      keywords: ["ENTRADA", "TIPO"],
+      exclude: ["CURSO"],
+    },
+    {
+      field: "canal",
+      aliases: ["CANAL_DA_MATRICULA", "CANAL", "CANAL_DE_CONTATO"],
+      keywords: ["CANAL"],
+    },
+    {
+      field: "plataforma",
+      aliases: ["PLATAFORMA_DETALHE", "PLATAFORMA"],
+      keywords: ["PLATAFORMA"],
+    },
+    {
+      field: "dataMatricula",
+      aliases: ["DATA_MATRICULA", "DATA_DA_MATRICULA", "DATA"],
+      keywords: ["DATA"],
+    },
+    {
+      // Por último: evita roubar colunas de curso/mãe/pai/responsável que
+      // por acaso contenham a palavra "NOME".
+      field: "name",
+      aliases: ["NOME", "NOME_ALUNO", "NAME", "NOME_COMPLETO", "ALUNO"],
+      keywords: ["NOME", "ALUNO"],
+      exclude: ["CURSO", "MAE", "PAI", "RESPONSAVEL", "POLO", "TURMA", "EMPRESA"],
+    },
+  ];
+
+  const ENGAJAMENTO_HEADER_KEYWORDS = [
+    ["POLO"],
+    ["NOME", "ALUNO"],
+    ["EMAIL", "E_MAIL"],
+    ["CELULAR", "TELEFONE", "FONE"],
+  ];
+
   /** Importa a aba comercial e cria cards apenas para o polo de Itajaí. */
   const importAlunosEngajamento = useCallback(async (
     file: File,
@@ -559,15 +721,38 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         try {
           const XLSX = await import("xlsx");
           const workbook = XLSX.read(event.target?.result, { type: "binary" });
-          const sheetName = workbook.SheetNames.find(
-            (name) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() === "SITE + APP"
-          );
-          if (!sheetName) return reject(new Error('A planilha precisa conter a aba "Site + App".'));
+
+          // Não trava mais no nome exato "Site + App": aceita variações de
+          // espaçamento/acentuação/caixa e, se não achar nenhuma aba com
+          // "SITE" e "APP" no nome, cai pra primeira aba que tiver uma
+          // coluna "Polo" (a real exigência de dado pra essa importação).
+          const normalizeSheetName = (name: string) =>
+            name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+          let sheetName = workbook.SheetNames.find((name) => {
+            const n = normalizeSheetName(name);
+            return n.includes("SITE") && n.includes("APP");
+          });
+
+          const findHeaderInSheet = (name: string) => {
+            const worksheet = workbook.Sheets[name];
+            const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: "" });
+            const idx = findHeaderRowIndex(rows, [["POLO"]], 1);
+            const hasPolo = (rows[idx] || []).some(
+              (cell) => normalizeHeader(String(cell ?? "")) === "POLO"
+            );
+            return hasPolo ? idx : -1;
+          };
+
+          if (!sheetName) {
+            sheetName = workbook.SheetNames.find((name) => findHeaderInSheet(name) >= 0);
+          }
+          if (!sheetName) {
+            return reject(new Error('Não foi encontrada nenhuma aba com a coluna "Polo" na planilha.'));
+          }
+
           const worksheet = workbook.Sheets[sheetName];
           const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: "" });
-          const headerRow = rows.findIndex((row) => row.some((cell) => String(cell)
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase() === "POLO"));
-          if (headerRow < 0) return reject(new Error('Não foi encontrada a coluna "Polo" na aba "Site + App".'));
+          const headerRow = findHeaderRowIndex(rows, ENGAJAMENTO_HEADER_KEYWORDS, 2);
           resolve(XLSX.utils.sheet_to_json(worksheet, { range: headerRow, defval: "" }));
         } catch {
           reject(new Error("Erro ao processar arquivo"));
@@ -577,37 +762,26 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       reader.readAsBinaryString(file);
     });
 
-    const normalizeRow = (rawRow: unknown): Record<string, string> => {
-      const normalized: Record<string, string> = {};
-      Object.entries(rawRow as Record<string, unknown>).forEach(([key, value]) => {
-        const normalizedKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-          .trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-        normalized[normalizedKey] = value != null ? String(value).trim() : "";
-      });
-      return normalized;
-    };
-    const pick = (row: Record<string, string>, keys: string[]) => {
-      const key = keys.find((item) => row[item]);
-      return key ? row[key] : "";
-    };
     const normalizedText = (value: string) => value.normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
     let ignored = 0;
     const alunosData = jsonData.map((rawRow) => {
-      const row = normalizeRow(rawRow);
-      const polo = pick(row, ["POLO"]);
+      const row = normalizeRow(rawRow as Record<string, unknown>);
+      const campos = pickFields(row, ENGAJAMENTO_FIELD_SPECS);
+
+      const polo = campos.polo || "";
       if (!normalizedText(polo).includes("itajai")) { ignored += 1; return null; }
-      const name = pick(row, ["NOME", "NOME_ALUNO", "NAME"]);
-      const email = pick(row, ["E_MAIL", "EMAIL"]);
-      const phone = pick(row, ["CELULAR", "TELEFONE", "FONE", "PHONE"]);
+      const name = campos.name || "";
+      const email = campos.email || "";
+      const phone = campos.phone || "";
       if (!name && !email && !phone) { ignored += 1; return null; }
 
-      const cpf = pick(row, ["CPF"]);
-      const tipoEntrada = pick(row, ["TIPO_DE_ENTRADA", "TIPO"]);
-      const canal = pick(row, ["CANAL_DA_MATRICULA", "CANAL"]);
-      const plataforma = pick(row, ["PLATAFORMA_DETALHE", "PLATAFORMA"]);
-      const dataMatricula = pick(row, ["DATA_MATRICULA"]);
+      const cpf = campos.cpf || "";
+      const tipoEntrada = campos.tipoEntrada || "";
+      const canal = campos.canal || "";
+      const plataforma = campos.plataforma || "";
+      const dataMatricula = campos.dataMatricula || "";
       const observacoes = [
         canal && `Canal da matrícula: ${canal}`,
         plataforma && `Plataforma: ${plataforma}`,
@@ -617,8 +791,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
 
       const aluno: Omit<Aluno, "id" | "createdAt" | "updatedAt" | "interactions"> = {
         name, email, phone,
-        ra: pick(row, ["CODIGO_INSCRICAO", "RA", "MATRICULA"]) || undefined,
-        curso: pick(row, ["CURSO", "NOME_CURSO"]) || undefined,
+        ra: campos.ra || undefined,
+        curso: campos.curso || undefined,
         area: "engajamento" as const,
         status: "novo_cadastro" as Aluno["status"],
         statusAtualizadoEm: new Date(),

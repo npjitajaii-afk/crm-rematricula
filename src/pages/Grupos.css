@@ -197,7 +197,7 @@
 }
 
 .grupo-aluno-linha:hover .grupo-aluno-nome {
-  color: var(--color-primary, #067a7b);
+  color: var(--primary-dark, #37409C);
   text-decoration: underline;
 }
 

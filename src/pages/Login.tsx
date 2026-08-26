@@ -11,6 +11,7 @@ import {
   EyeOff,
   GraduationCap,
 } from "lucide-react";
+import glowingFishLoader from "../assets/glowing-fish-loader.svg";
 import "./Login.css";
 
 const Login: React.FC = () => {
@@ -47,11 +48,16 @@ const Login: React.FC = () => {
 
   return (
     <div className="login-container">
+      {/* Fundo animado */}
+      <div className="login-glow-bg" aria-hidden="true">
+        <img src={glowingFishLoader} alt="" />
+      </div>
+
       <div className="login-card">
         <div className="login-header">
           <div className="login-brand">
             <GraduationCap size={15} />
-            CRM Acadêmico
+            Bask CRM
           </div>
           <div className="login-icon">
             <LogIn size={32} />

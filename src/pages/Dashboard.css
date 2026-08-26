@@ -137,13 +137,13 @@
 }
 .pipeline-dot[data-status="pendente"] { background-color: #ef4444; }
 .pipeline-dot[data-status="cadastrado"] { background-color: #6b7280; }
-.pipeline-dot[data-status="contatado"] { background-color: #4DBDBD; }
+.pipeline-dot[data-status="contatado"] { background-color: #8B95E3; }
 .pipeline-dot[data-status="aguardando_retorno"] { background-color: #3b82f6; }
-.pipeline-dot[data-status="confirmado"] { background-color: #00A9AA; }
+.pipeline-dot[data-status="confirmado"] { background-color: #4C5FC7; }
 .pipeline-dot[data-status="documentacao"] { background-color: #E0B400; }
 .pipeline-dot[data-status="aguardando_matricula"] { background-color: #F5920A; }
 .pipeline-dot[data-status="matricula_confirmada"] { background-color: #22c55e; }
-.pipeline-dot[data-status="rematriculado"] { background-color: #067A7B; }
+.pipeline-dot[data-status="rematriculado"] { background-color: #37409C; }
 .pipeline-dot[data-status="desistente"] { background-color: #9ca3af; }
 
 .pipeline-nome {

@@ -162,8 +162,8 @@ const Layout: React.FC = () => {
     <div className="layout">
       <aside className={`rail ${isRailOpen ? "open" : ""}`}>
         <div className="rail-brand">
-          <div className="rail-brand-badge">UR</div>
-          <span className="rail-brand-name">UniRemat</span>
+          <div className="rail-brand-badge">B</div>
+          <span className="rail-brand-name">Bask CRM</span>
           <button
             className="rail-close"
             onClick={() => setIsRailOpen(false)}
@@ -220,7 +220,7 @@ const Layout: React.FC = () => {
             <Menu size={22} />
           </button>
 
-          <span className="topbar-title">CRM de Rematrícula</span>
+          <span className="topbar-title">Bask CRM</span>
 
           <div className="topbar-spacer" />
 
