@@ -342,20 +342,37 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     [alunos]
   );
 
+  // Remove acentos e coloca em minúsculo para comparação insensível a acentuação.
+  // Ex: "João" e "joao" passam a ser equivalentes na busca.
+  const normalizeSearch = (str: string) =>
+    str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
   // Otimização 5.2: useMemo evita recalcular o filtro em todo re-render,
   // só refaz o filtro quando `alunos` ou `filters` realmente mudam.
   const filteredAlunos = useMemo(() => {
-    return alunos.filter((aluno) => {
+    const resultado = alunos.filter((aluno) => {
       if (filters.area && aluno.area !== filters.area) return false;
 
       if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
+        // Normaliza o termo de busca (remove acentos, minúsculo)
+        const searchNorm = normalizeSearch(filters.search);
+
+        // Telefone: busca nos dígitos apenas (ignora formatação)
+        const phoneDigits = aluno.phone.replace(/\D/g, "");
+        const searchDigits = filters.search.replace(/\D/g, "");
+
         const matchesSearch =
-          aluno.name.toLowerCase().includes(searchLower) ||
-          aluno.email.toLowerCase().includes(searchLower) ||
-          aluno.curso?.toLowerCase().includes(searchLower) ||
-          aluno.ra?.toLowerCase().includes(searchLower) ||
-          aluno.phone.includes(filters.search);
+          normalizeSearch(aluno.name).includes(searchNorm) ||
+          normalizeSearch(aluno.email).includes(searchNorm) ||
+          (aluno.curso && normalizeSearch(aluno.curso).includes(searchNorm)) ||
+          (aluno.ra && normalizeSearch(aluno.ra).includes(searchNorm)) ||
+          (aluno.turno && normalizeSearch(aluno.turno).includes(searchNorm)) ||
+          (aluno.observations && normalizeSearch(aluno.observations).includes(searchNorm)) ||
+          (aluno.tags && aluno.tags.some((tag) => normalizeSearch(tag).includes(searchNorm))) ||
+          (searchDigits.length >= 4 && phoneDigits.includes(searchDigits));
 
         if (!matchesSearch) return false;
       }
@@ -384,6 +401,16 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
 
       return true;
     });
+
+    // Alunos sem responsável ficam no topo — são os que precisam de atenção.
+    // Dentro de cada grupo (com/sem responsável), mantém a ordem original.
+    resultado.sort((a, b) => {
+      const aSemResponsavel = !a.assignedTo ? 0 : 1;
+      const bSemResponsavel = !b.assignedTo ? 0 : 1;
+      return aSemResponsavel - bSemResponsavel;
+    });
+
+    return resultado;
   }, [alunos, filters]);
 
   /**
