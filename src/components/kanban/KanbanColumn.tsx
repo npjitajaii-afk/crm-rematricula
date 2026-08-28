@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import { Aluno, AlunoStatus, AlertaInatividade } from "../../types";
 import { getStatusLabel } from "../../utils/formatters";
 import AlunoCard from "./AlunoCard";
 import "./KanbanColumn.css";
+
+const CARDS_POR_PAGINA = 10;
 
 interface KanbanColumnProps {
   status: AlunoStatus;
@@ -13,6 +15,12 @@ interface KanbanColumnProps {
   totalGeral?: number;
   /** Alertas de inatividade por alunoId (E1). Vazio fora do Engajamento. */
   alertas?: Map<string, AlertaInatividade>;
+  /**
+   * Muda (ex: novo termo de busca) → volta a mostrar só os primeiros
+   * CARDS_POR_PAGINA cards da coluna. Opcional; sem isso a coluna nunca
+   * reseta sozinha (drag/edição não deve esconder cards já carregados).
+   */
+  resetSignal?: string;
 }
 
 // Otimização (Bloco B): React.memo evita re-renderizar uma coluna inteira
@@ -26,9 +34,23 @@ const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   color,
   totalGeral,
   alertas,
+  resetSignal,
 }) => {
   const outrosNaColuna =
     typeof totalGeral === "number" ? Math.max(totalGeral - alunos.length, 0) : 0;
+
+  // Performance: colunas com muitos alunos (ex: "Pendente de Contato" numa
+  // importação grande) só montam os primeiros 10 cards de cada vez, em vez
+  // de todos de uma vez — cada AlunoCard carrega bastante coisa (badges,
+  // ações, contexto). "Carregar mais" estende 10 em 10.
+  const [visibleCount, setVisibleCount] = useState(CARDS_POR_PAGINA);
+
+  useEffect(() => {
+    setVisibleCount(CARDS_POR_PAGINA);
+  }, [resetSignal]);
+
+  const alunosVisiveis = alunos.slice(0, visibleCount);
+  const restantes = alunos.length - alunosVisiveis.length;
 
   return (
     <div className="kanban-column">
@@ -57,7 +79,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
                 <p>Nenhum aluno neste estágio</p>
               </div>
             ) : (
-              alunos.map((aluno, index) => (
+              alunosVisiveis.map((aluno, index) => (
                 <Draggable key={aluno.id} draggableId={aluno.id} index={index}>
                   {(provided, snapshot) => (
                     <div
@@ -82,6 +104,16 @@ const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
           </div>
         )}
       </Droppable>
+
+      {restantes > 0 && (
+        <button
+          type="button"
+          className="btn btn-secondary kanban-carregar-mais"
+          onClick={() => setVisibleCount((v) => v + CARDS_POR_PAGINA)}
+        >
+          Carregar mais ({restantes} restantes)
+        </button>
+      )}
     </div>
   );
 });

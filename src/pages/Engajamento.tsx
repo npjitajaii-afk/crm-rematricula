@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
@@ -57,6 +57,23 @@ const Engajamento: React.FC = () => {
     (aluno) => aluno.area === "engajamento"
   );
 
+  // Correção de performance: mesma lógica aplicada em src/pages/Alunos.tsx —
+  // paginação client-side de 10 em 10, sem tocar no resto do fluxo.
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filteredAlunos.length / PAGE_SIZE));
+  const paginatedAlunos = useMemo(
+    () =>
+      filteredAlunos.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+      ),
+    [filteredAlunos, currentPage]
+  );
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [totalPages, currentPage]);
+
   const { user } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -70,9 +87,16 @@ const Engajamento: React.FC = () => {
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Debounce: mesma lógica de Alunos.tsx — só reaplica o filtro global
+  // 300ms depois que a pessoa parar de digitar.
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    setFilters({ ...filters, search: value });
+    setCurrentPage(1);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setFilters({ ...filters, search: value });
+    }, 300);
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -256,7 +280,7 @@ const Engajamento: React.FC = () => {
             )}
           </div>
 
-          {filteredAlunos.map((aluno) => {
+          {paginatedAlunos.map((aluno) => {
             const isOwner = aluno.assignedTo === user?.id;
             const semResponsavel = !aluno.assignedTo;
             const podeEditar = isAdmin || isOwner;
@@ -286,6 +310,38 @@ const Engajamento: React.FC = () => {
               />
             );
           })}
+
+          {totalPages > 1 && (
+            <div
+              className="leads-pagination"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "1rem",
+                padding: "1rem",
+              }}
+            >
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </button>
+              <span>
+                Página {currentPage} de {totalPages} ({filteredAlunos.length}{" "}
+                contatos)
+              </span>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Próxima
+              </button>
+            </div>
+          )}
         </div>
       )}
 

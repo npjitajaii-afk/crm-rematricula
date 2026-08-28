@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
@@ -41,6 +41,29 @@ const Alunos: React.FC = () => {
   const filteredAlunos = filteredAlunosTodasAreas.filter(
     (aluno) => aluno.area === "rematricula"
   );
+
+  // Correção de performance: com centenas de contatos (ex: importação de
+  // não renovados), renderizar a lista inteira de uma vez deixa a tela
+  // pesada (muitos nós de DOM + estado próprio de cada linha). Em vez de
+  // reescrever a lista pra virtualizada, paginamos no cliente — mudança
+  // pequena, sem tocar no resto do fluxo (seleção continua valendo sobre
+  // todos os filtrados, não só a página atual).
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filteredAlunos.length / PAGE_SIZE));
+  const paginatedAlunos = useMemo(
+    () =>
+      filteredAlunos.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+      ),
+    [filteredAlunos, currentPage]
+  );
+  // Sempre que o filtro muda (busca, status, etc.) e a página atual deixa
+  // de existir (ex: filtro reduziu o total), volta pra página 1.
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [totalPages, currentPage]);
   const { user } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -96,9 +119,17 @@ const Alunos: React.FC = () => {
     { value: "outro", label: "Outro" },
   ];
 
+  // Debounce: só reprocessa o filtro (que roda sobre TODOS os alunos, não
+  // só a página atual) 300ms depois que a pessoa parar de digitar, em vez
+  // de re-filtrar/re-renderizar a cada tecla.
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    setFilters({ ...filters, search: value });
+    setCurrentPage(1);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setFilters({ ...filters, search: value });
+    }, 300);
   };
 
   const handleStatusFilter = (status: string) => {
@@ -435,7 +466,7 @@ const Alunos: React.FC = () => {
             )}
           </div>
 
-          {filteredAlunos.map((aluno) => {
+          {paginatedAlunos.map((aluno) => {
             const isOwner = aluno.assignedTo === user?.id;
             const semResponsavel = !aluno.assignedTo;
             const podeEditar = isAdmin || isOwner;
@@ -465,6 +496,38 @@ const Alunos: React.FC = () => {
               />
             );
           })}
+
+          {totalPages > 1 && (
+            <div
+              className="leads-pagination"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "1rem",
+                padding: "1rem",
+              }}
+            >
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </button>
+              <span>
+                Página {currentPage} de {totalPages} ({filteredAlunos.length}{" "}
+                contatos)
+              </span>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Próxima
+              </button>
+            </div>
+          )}
         </div>
       )}
 

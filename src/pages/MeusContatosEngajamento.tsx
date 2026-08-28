@@ -1,6 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import KanbanBoard from "../components/kanban/KanbanBoard";
@@ -20,6 +20,11 @@ const MeusContatosEngajamento: React.FC = () => {
   const { filteredAlunos } = useAlunos();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Busca própria desta aba: fica em estado local (useState), nunca passa
+  // por setFilters do AlunosContext. Mesmo padrão de MeusContatos.tsx
+  // (Rematrícula) — mantém a busca isolada deste board.
+  const [searchTerm, setSearchTerm] = useState("");
 
   const totalMeus = useMemo(
     () =>
@@ -52,7 +57,17 @@ const MeusContatosEngajamento: React.FC = () => {
         </div>
       </div>
 
-      <KanbanBoard area="engajamento" onlyMine />
+      <div className="search-box" style={{ maxWidth: "360px" }}>
+        <Search size={20} />
+        <input
+          type="text"
+          placeholder="Buscar nos meus contatos..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      <KanbanBoard area="engajamento" onlyMine searchTerm={searchTerm} />
     </div>
   );
 };

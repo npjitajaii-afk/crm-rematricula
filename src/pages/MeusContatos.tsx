@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import KanbanBoard from "../components/kanban/KanbanBoard";
@@ -12,6 +13,13 @@ import "./MeusContatos.css";
 const MeusContatos: React.FC = () => {
   const { filteredAlunos } = useAlunos();
   const { user } = useAuth();
+
+  // Busca própria desta aba: fica em estado local (useState), nunca passa
+  // por setFilters do AlunosContext. Isso é proposital — o mesmo contexto
+  // de alunos é usado por Alunos.tsx e pelo Funil geral, então se essa
+  // busca escrevesse no filtro global ela vazaria pras outras abas do
+  // mesmo funil. Aqui ela só filtra o board local via prop.
+  const [searchTerm, setSearchTerm] = useState("");
 
   const totalMeus = useMemo(
     () =>
@@ -35,7 +43,17 @@ const MeusContatos: React.FC = () => {
         </div>
       </div>
 
-      <KanbanBoard area="rematricula" onlyMine />
+      <div className="search-box" style={{ maxWidth: "360px" }}>
+        <Search size={20} />
+        <input
+          type="text"
+          placeholder="Buscar nos meus contatos..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      <KanbanBoard area="rematricula" onlyMine searchTerm={searchTerm} />
     </div>
   );
 };

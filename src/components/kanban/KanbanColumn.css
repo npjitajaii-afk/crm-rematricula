@@ -140,3 +140,10 @@
     font-size: 0.8125rem;
   }
 }
+
+.kanban-carregar-mais {
+  width: 100%;
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  padding: 0.5rem;
+}

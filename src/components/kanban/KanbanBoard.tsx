@@ -19,11 +19,20 @@ interface KanbanBoardProps {
    * componente em vez de duplicar a lógica do Kanban.
    */
   onlyMine?: boolean;
+  /**
+   * Busca LOCAL, aplicada só neste board (nome/e-mail/telefone/RA) por
+   * cima do que já vem filtrado pelo contexto global (useAlunos).
+   * Propositalmente não usa o `filters`/`setFilters` do AlunosContext:
+   * isso mantém essa busca isolada da aba (não afeta Alunos, Funil geral,
+   * Risco de Evasão etc, mesmo estando no mesmo funil/área).
+   */
+  searchTerm?: string;
 }
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({
   area = "rematricula",
   onlyMine = false,
+  searchTerm,
 }) => {
   const { filteredAlunos, updateAluno, statusResumo, isAdmin } = useAlunos();
   const { user } = useAuth();
@@ -76,14 +85,20 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const mapa = new Map<AlunoStatus, typeof filteredAlunos>();
     for (const status of statuses) mapa.set(status, []);
 
+    const termo = searchTerm?.trim().toLowerCase();
+
     for (const aluno of filteredAlunos) {
       if (aluno.area !== area) continue;
       if (onlyMine && aluno.assignedTo !== user?.id) continue;
+      if (termo) {
+        const alvo = `${aluno.name} ${aluno.email ?? ""} ${aluno.phone ?? ""} ${aluno.ra ?? ""}`.toLowerCase();
+        if (!alvo.includes(termo)) continue;
+      }
       mapa.get(aluno.status)?.push(aluno);
     }
 
     return mapa;
-  }, [filteredAlunos, area, statuses, onlyMine, user]);
+  }, [filteredAlunos, area, statuses, onlyMine, user, searchTerm]);
 
   const getAlunosByStatus = useCallback(
     (status: AlunoStatus) => alunosPorStatus.get(status) ?? [],
@@ -226,6 +241,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
               color={config.getColor(status)}
               totalGeral={isAdmin ? undefined : getTotalByStatus(status)}
               alertas={alertas}
+              resetSignal={searchTerm}
             />
           ))}
         </div>
