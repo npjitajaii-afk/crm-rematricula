@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ReactNode, useCallback } from "react";
+import React, { useState, useEffect, ReactNode, useCallback, useRef } from "react";
 import { ChecklistItem } from "../types";
 import {
   getTodosItensChecklist,
@@ -12,6 +12,17 @@ import { ChecklistContext } from "./checklist-context";
 interface ChecklistProviderProps {
   children: ReactNode;
 }
+
+// Total de itens definido pela trigger de seed (ver
+// database/009_checklist_engajamento.sql). Um aluno só é considerado
+// "carregado" quando o número de itens retornado bate com isso — não
+// basta ter vindo alguma coisa, senão um aluno pego pela busca em massa
+// no meio da inserção (ex: 1 de 7 itens) nunca mais tenta buscar o resto.
+const TOTAL_ITENS_CHECKLIST = 7;
+// Limite de tentativas de busca individual por aluno, pra não martelar
+// o banco indefinidamente caso um aluno realmente fique com menos de 7
+// itens por algum motivo legítimo (edição manual, etc).
+const MAX_TENTATIVAS_CARREGAMENTO = 4;
 
 /** Agrupa a lista plana de itens em um mapa alunoId -> itens (ordenados). */
 function agrupar(itens: ChecklistItem[]): Record<string, ChecklistItem[]> {
@@ -32,11 +43,23 @@ export const ChecklistProvider: React.FC<ChecklistProviderProps> = ({
   );
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+  // Estado de carregamento por aluno: `completo` só vira true quando
+  // vieram os 7 itens; `tentativas` limita quantas vezes
+  // `garantirItensCarregados` tenta buscar de novo enquanto parcial.
+  const statusCarregamentoRef = useRef<
+    Map<string, { completo: boolean; tentativas: number }>
+  >(new Map());
 
   // Substitui, dentro do mapa, os itens de UM aluno (usado após um
-  // evento de realtime, pra já trazer o nome de quem concluiu via join).
+  // evento de realtime, pra já trazer o nome de quem concluiu via join,
+  // e também na busca ativa de garantirItensCarregados).
   const resincronizarAluno = useCallback(async (alunoId: string) => {
     const { itens } = await getItensChecklistPorAluno(alunoId);
+    const anterior = statusCarregamentoRef.current.get(alunoId);
+    statusCarregamentoRef.current.set(alunoId, {
+      completo: itens.length >= TOTAL_ITENS_CHECKLIST,
+      tentativas: (anterior?.tentativas ?? 0) + 1,
+    });
     if (itens.length === 0) return;
     setItensPorAluno((prev) => ({
       ...prev,
@@ -44,9 +67,31 @@ export const ChecklistProvider: React.FC<ChecklistProviderProps> = ({
     }));
   }, []);
 
+  // Busca ativa: chamada por quem renderiza o card/modal de um aluno de
+  // Engajamento. O carregamento inicial (`load`, abaixo) e o realtime só
+  // enxergam linhas que já existiam/mudaram durante esta sessão — se a
+  // checklist do aluno foi criada pelo banco um instante antes ou depois
+  // do carregamento inicial, ela nunca chega sozinha, e o único jeito de
+  // aparecer era o usuário mexer numa tarefa (o que força um resync via
+  // realtime). Isso resolve sem precisar desse gatilho manual.
+  //
+  // Enquanto o aluno não estiver com os 7 itens completos, segue
+  // tentando buscar de novo (até MAX_TENTATIVAS_CARREGAMENTO), em vez de
+  // desistir na primeira resposta parcial.
+  const garantirItensCarregados = useCallback(
+    (alunoId: string) => {
+      const status = statusCarregamentoRef.current.get(alunoId);
+      if (status?.completo) return;
+      if (status && status.tentativas >= MAX_TENTATIVAS_CARREGAMENTO) return;
+      resincronizarAluno(alunoId);
+    },
+    [resincronizarAluno]
+  );
+
   useEffect(() => {
     if (!user) {
       setItensPorAluno({});
+      statusCarregamentoRef.current.clear();
       return;
     }
 
@@ -59,6 +104,19 @@ export const ChecklistProvider: React.FC<ChecklistProviderProps> = ({
         console.error("Erro ao carregar checklist de engajamento:", error);
       } else if (isMounted) {
         setItensPorAluno(agrupar(itens));
+        // Marca "completo" só quem já veio com os 7 itens na busca em
+        // massa. Quem veio parcial (ou não veio) continua elegível pra
+        // garantirItensCarregados tentar de novo.
+        const contagemPorAluno = new Map<string, number>();
+        for (const item of itens) {
+          contagemPorAluno.set(item.alunoId, (contagemPorAluno.get(item.alunoId) ?? 0) + 1);
+        }
+        contagemPorAluno.forEach((quantidade, alunoId) => {
+          statusCarregamentoRef.current.set(alunoId, {
+            completo: quantidade >= TOTAL_ITENS_CHECKLIST,
+            tentativas: 0,
+          });
+        });
       }
       setIsLoading(false);
     };
@@ -123,7 +181,9 @@ export const ChecklistProvider: React.FC<ChecklistProviderProps> = ({
   };
 
   return (
-    <ChecklistContext.Provider value={{ itensPorAluno, isLoading, toggleItem }}>
+    <ChecklistContext.Provider
+      value={{ itensPorAluno, isLoading, toggleItem, garantirItensCarregados }}
+    >
       {children}
     </ChecklistContext.Provider>
   );

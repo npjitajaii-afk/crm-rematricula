@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useAlunos } from "../hooks/useAlunos";
@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   Send,
+  Loader2,
 } from "lucide-react";
 import { Area } from "../types";
 import NotificacoesSininho from "./NotificacoesSininho";
@@ -248,7 +249,20 @@ const Layout: React.FC = () => {
         )}
 
         <main className="content">
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="page-loader">
+                <Loader2
+                  size={32}
+                  className="spin"
+                  style={{ color: "var(--primary)" }}
+                />
+                <p style={{ color: "var(--text-secondary)" }}>Carregando...</p>
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

@@ -187,6 +187,12 @@ export interface ChecklistContextType {
   itensPorAluno: Record<string, ChecklistItem[]>;
   isLoading: boolean;
   toggleItem: (item: ChecklistItem, concluido: boolean) => Promise<void>;
+  /** Garante que a checklist de UM aluno está carregada no estado.
+   * Usado por quem renderiza o card/modal desse aluno — não dá pra
+   * confiar só no realtime porque ele não repõe linhas que já
+   * existiam no banco antes da inscrição no canal (ver
+   * ChecklistContext.tsx). Não faz nada se o aluno já está no mapa. */
+  garantirItensCarregados: (alunoId: string) => void;
 }
 
 // ---- Tarefas pessoais (Engajamento) ----
@@ -321,24 +327,42 @@ export interface NotificacoesContextType {
 
 // ---- Métricas ----
 
+// Status considerados "sucesso" e "terminal" em cada área — usados tanto no
+// service (cálculo em JS a partir das linhas brutas de `alunos`) quanto nas
+// views SQL de 016_metricas_multi_funil.sql, que replicam a mesma lógica.
+export const METRICA_STATUS_SUCESSO: Record<Area, AlunoStatus[]> = {
+  rematricula: ["rematriculado"],
+  retencao: ["recuperado"],
+  engajamento: ["engajado", "estabilizado"],
+};
+
+export const METRICA_STATUS_TERMINAL: Record<Area, AlunoStatus[]> = {
+  rematricula: ["rematriculado", "desistente"],
+  retencao: ["recuperado", "perdido"],
+  engajamento: ["estabilizado", "desistente"],
+};
+
 export interface MetricasGerais {
+  area: Area;
   totalAlunos: number;
-  rematriculados: number;
+  /** Quantos atingiram o status de sucesso da área (ver METRICA_STATUS_SUCESSO). */
+  sucesso: number;
   taxaConversao: number;
-  valorRecuperado: number;
+  /** Valor pendente somado dos que tiveram sucesso (0 em áreas sem componente financeiro). */
+  valorPrincipal: number;
   valorTotalCarteira: number;
   interacoesHoje: number;
   alunosSemResponsavel: number;
+  /** Média de dias entre criação e chegada ao status de sucesso. Null se não houver nenhum caso ainda. */
+  tempoMedioCicloDias: number | null;
 }
 
 export interface MetricaColaborador {
   colaboradorId: string;
   colaboradorNome: string;
   totalAlunos: number;
-  rematriculados: number;
-  desistentes: number;
-  confirmados: number;
-  pendentes: number;
+  sucesso: number;
+  encerradosSemSucesso: number;
   valorRecuperado: number;
   valorTotalCarteira: number;
   totalInteracoes: number;
@@ -348,8 +372,16 @@ export interface MetricaColaborador {
 export interface MetricaCanal {
   canal: string;
   total: number;
-  rematriculados: number;
+  sucesso: number;
   taxaConversao: number;
+}
+
+// ---- Métricas — visão geral (cabeçalho fixo da tela, todas as áreas) ----
+export interface MetricasOverviewGeral {
+  totalGeral: number;
+  porArea: Record<Area, number>;
+  alertasPorArea: Record<Area, number>;
+  totalAlertas: number;
 }
 
 // ---- Gestão de usuários (tela de Usuários, admin-only) ----

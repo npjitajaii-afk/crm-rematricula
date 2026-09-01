@@ -1,5 +1,6 @@
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AlunosProvider } from "./contexts/AlunosContext";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -36,6 +37,22 @@ const AlunoDetails        = lazy(() => import("./pages/AlunoDetails"));
 const AlunoForm           = lazy(() => import("./pages/AlunoForm"));
 const MinhaArea           = lazy(() => import("./pages/MinhaArea"));
 
+function AuthPageLoader() {
+  return (
+    <div
+      className="page-loader"
+      style={{ minHeight: "100vh" }}
+    >
+      <Loader2
+        size={48}
+        className="spin"
+        style={{ color: "var(--primary)" }}
+      />
+      <p style={{ color: "var(--text-secondary)" }}>Carregando...</p>
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -48,10 +65,23 @@ function App() {
               <WhatsappProvider>
                 <TarefasEngajamentoProvider>
                 <AgendaEngajamentoProvider>
-                <Suspense fallback={null}>
                   <Routes>
-                    <Route path="/login"    element={<Login />} />
-                    <Route path="/register" element={<Register />} />
+                    <Route
+                      path="/login"
+                      element={
+                        <Suspense fallback={<AuthPageLoader />}>
+                          <Login />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/register"
+                      element={
+                        <Suspense fallback={<AuthPageLoader />}>
+                          <Register />
+                        </Suspense>
+                      }
+                    />
 
                     <Route
                       path="/"
@@ -117,7 +147,6 @@ function App() {
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
-                </Suspense>
                 </AgendaEngajamentoProvider>
                 </TarefasEngajamentoProvider>
               </WhatsappProvider>

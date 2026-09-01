@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Aluno, AlertaInatividade } from "../../types";
 import {
   Mail,
@@ -57,7 +57,7 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   const [delegando, setDelegando] = useState(false);
   const [criandoVinculada, setCriandoVinculada] = useState(false);
   const { showToast } = useToast();
-  const { itensPorAluno } = useChecklist();
+  const { itensPorAluno, garantirItensCarregados } = useChecklist();
   const { resumoPorAluno } = useWhatsapp();
   const { compromissos } = useAgendaEngajamento();
   const { user } = useAuth();
@@ -65,6 +65,14 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   // Checklist só existe (é criada automaticamente pelo banco) para
   // alunos da área "engajamento" — ver database/009_checklist_engajamento.sql.
   const itensChecklist = aluno.area === "engajamento" ? itensPorAluno[aluno.id] : undefined;
+  // Sem isso, um aluno cuja checklist não veio na busca inicial em massa
+  // (ver ChecklistContext.tsx) só aparecia depois que alguém mexia numa
+  // tarefa dele — o clique disparava o resync que deveria acontecer aqui.
+  useEffect(() => {
+    if (aluno.area === "engajamento") {
+      garantirItensCarregados(aluno.id);
+    }
+  }, [aluno.area, aluno.id, garantirItensCarregados]);
   // Resumo de WhatsApp vale pra qualquer área — a mensagem chega pelo
   // telefone, independente do funil em que o aluno está.
   const resumoWhatsapp = resumoPorAluno[aluno.id];

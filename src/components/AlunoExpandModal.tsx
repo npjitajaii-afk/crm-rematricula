@@ -63,8 +63,12 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
 }) => {
   const { getAluno, updateAluno, colaboradores, isAdmin } = useAlunos();
   const [criandoVinculada, setCriandoVinculada] = useState(false);
-  const { itensPorAluno, toggleItem, isLoading: checklistCarregando } =
-    useChecklist();
+  const {
+    itensPorAluno,
+    toggleItem,
+    isLoading: checklistCarregando,
+    garantirItensCarregados,
+  } = useChecklist();
   const { showToast } = useToast();
 
   const { user } = useAuth();
@@ -197,6 +201,15 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   const itensChecklist =
     aluno.area === "engajamento" ? itensPorAluno[aluno.id] : undefined;
   const concluidos = itensChecklist?.filter((i) => i.concluido).length || 0;
+
+  // Mesmo caso do AlunoCard: garante que a checklist deste aluno foi
+  // buscada, sem depender de o usuário mexer numa tarefa pra "revelar"
+  // as demais.
+  useEffect(() => {
+    if (aluno.area === "engajamento") {
+      garantirItensCarregados(aluno.id);
+    }
+  }, [aluno.area, aluno.id, garantirItensCarregados]);
 
   const handleStatusChange = async (status: AlunoStatus) => {
     try {

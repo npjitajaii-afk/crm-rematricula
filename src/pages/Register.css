@@ -45,7 +45,7 @@
   font-size: 0.9375rem;
 }
 
-.error-message {
+.register-card .error-message {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -93,13 +93,13 @@
   gap: 1.25rem;
 }
 
-.form-group {
+.register-form .form-group {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.form-group label {
+.register-form .form-group label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -108,22 +108,22 @@
   color: var(--text-primary);
 }
 
-.form-group input {
+.register-form .form-group input {
   font-size: 0.9375rem;
 }
 
-.password-wrapper {
+.register-form .password-wrapper {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.password-wrapper input {
+.register-form .password-wrapper input {
   width: 100%;
   padding-right: 2.5rem;
 }
 
-.password-toggle {
+.register-form .password-toggle {
   position: absolute;
   right: 0.5rem;
   background: none;
@@ -136,7 +136,7 @@
   cursor: pointer;
 }
 
-.password-toggle:disabled {
+.register-form .password-toggle:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -153,29 +153,16 @@
   color: var(--text-secondary);
 }
 
-.link {
+.register-footer .link {
   color: var(--primary);
   font-weight: 500;
   text-decoration: none;
   transition: var(--transition);
 }
 
-.link:hover {
+.register-footer .link:hover {
   color: var(--primary-dark);
   text-decoration: underline;
-}
-
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (max-width: 480px) {

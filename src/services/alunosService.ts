@@ -26,6 +26,31 @@ const SELECT_WITH_INTERACOES = `
   )
 `;
 
+// Limites de coluna da tabela `alunos` (database/schema.sql). Um INSERT em
+// lote é atômico no Postgres: se 1 linha estourar um desses limites, o
+// banco rejeita o lote inteiro — inclusive as ~200 linhas boas que vieram
+// junto. Sanitizamos os campos antes de montar o INSERT pra isso nunca
+// mais acontecer.
+const LIMITE_NOME = 255;
+const LIMITE_EMAIL = 255;
+const LIMITE_TELEFONE = 50;
+const LIMITE_RA = 50;
+const LIMITE_CURSO = 255;
+const LIMITE_TURNO = 50;
+
+// Planilhas às vezes trazem "telefone1; telefone2; telefone3" ou vários
+// e-mails na mesma célula — fica maior que a coluna aguenta. Guardamos só
+// o primeiro valor (o principal) e truncamos como garantia final.
+function primeiroValor(valor: string): string {
+  const primeiro = valor.split(';')[0]?.trim();
+  return primeiro || valor.trim();
+}
+
+function sanitizarCampo(valor: string, limite: number, pegarPrimeiro = false): string {
+  const base = pegarPrimeiro ? primeiroValor(valor) : valor.trim();
+  return base.length > limite ? base.slice(0, limite) : base;
+}
+
 /**
  * Converte dados do banco para o tipo Aluno
  */
@@ -269,12 +294,12 @@ export async function createAluno(
       .from('alunos')
       .insert([
         {
-          nome: aluno.name,
-          email: aluno.email,
-          telefone: aluno.phone,
-          ra: aluno.ra || null,
-          curso: aluno.curso || null,
-          turno: aluno.turno || null,
+          nome: sanitizarCampo(aluno.name, LIMITE_NOME),
+          email: sanitizarCampo(aluno.email, LIMITE_EMAIL, true),
+          telefone: sanitizarCampo(aluno.phone, LIMITE_TELEFONE, true),
+          ra: aluno.ra ? sanitizarCampo(aluno.ra, LIMITE_RA) : null,
+          curso: aluno.curso ? sanitizarCampo(aluno.curso, LIMITE_CURSO) : null,
+          turno: aluno.turno ? sanitizarCampo(aluno.turno, LIMITE_TURNO) : null,
           area: aluno.area,
           status: aluno.status,
           canal_contato: aluno.source,
@@ -398,12 +423,12 @@ export async function createAlunosBulk(
   });
 
   const rows = alunosFiltrados.map((aluno) => ({
-    nome: aluno.name,
-    email: aluno.email,
-    telefone: aluno.phone,
-    ra: aluno.ra || null,
-    curso: aluno.curso || null,
-    turno: aluno.turno || null,
+    nome: sanitizarCampo(aluno.name, LIMITE_NOME),
+    email: sanitizarCampo(aluno.email, LIMITE_EMAIL, true),
+    telefone: sanitizarCampo(aluno.phone, LIMITE_TELEFONE, true),
+    ra: aluno.ra ? sanitizarCampo(aluno.ra, LIMITE_RA) : null,
+    curso: aluno.curso ? sanitizarCampo(aluno.curso, LIMITE_CURSO) : null,
+    turno: aluno.turno ? sanitizarCampo(aluno.turno, LIMITE_TURNO) : null,
     area: aluno.area,
     status: aluno.status,
     canal_contato: aluno.source,
@@ -428,15 +453,29 @@ export async function createAlunosBulk(
   for (const batch of batches) {
     const { data, error } = await supabase.from('alunos').insert(batch).select('*');
 
-    if (error) {
-      console.error('Error bulk creating alunos:', error);
-      // Se mesmo assim algum duplicado passou (corrida com outra
-      // importação/cadastro rodando ao mesmo tempo), a constraint do
-      // banco barra o lote inteiro — reportamos como erro em vez de
-      // fingir sucesso, já que aqui não dá pra saber qual linha foi.
-      errors.push(error.message);
-    } else {
+    if (!error) {
       alunos.push(...(data || []).map(mapDatabaseToAluno));
+    } else {
+      console.error('Error bulk creating alunos:', error);
+      // Rede de segurança: mesmo sanitizado, algo ainda pode derrubar o
+      // lote inteiro (ex: corrida com outra importação rodando ao mesmo
+      // tempo). Em vez de perder as ~200 linhas boas do lote junto com a
+      // ruim, tenta uma a uma — só a linha que realmente tem problema
+      // falha, e conseguimos dizer qual é (pelo nome), em vez de um erro
+      // genérico do lote inteiro.
+      for (const row of batch) {
+        const { data: rowData, error: rowError } = await supabase
+          .from('alunos')
+          .insert([row])
+          .select('*')
+          .single();
+
+        if (rowError) {
+          errors.push(`${row.nome}: ${rowError.message}`);
+        } else if (rowData) {
+          alunos.push(mapDatabaseToAluno(rowData));
+        }
+      }
     }
 
     done += batch.length;
