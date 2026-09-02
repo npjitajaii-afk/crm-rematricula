@@ -190,3 +190,27 @@
   color: var(--gray-500);
   font-style: italic;
 }
+
+.usuario-polo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 180px;
+}
+
+.usuario-polo label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.usuario-polo select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: var(--background);
+  color: var(--text-primary);
+}

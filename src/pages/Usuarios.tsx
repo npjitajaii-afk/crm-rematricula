@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { getUsuarios, definirStatusUsuario, definirAreasUsuario, definirPoloUsuario } from "../services/usuariosService";
 import { Usuario, Area } from "../types";
-import { getUsuarios, definirStatusUsuario, definirAreasUsuario } from "../services/usuariosService";
 import { AREA_CONFIG } from "../config/areas";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
+import { useAlunos } from "../hooks/useAlunos";
 import {
   UserCog,
   Check,
@@ -32,6 +33,7 @@ const STATUS_INFO: Record<Usuario["status"], { label: string; className: string 
 const Usuarios: React.FC = () => {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const { polos } = useAlunos();
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -163,6 +165,32 @@ const Usuarios: React.FC = () => {
     setSavingId(null);
   };
 
+  const alterarPolo = async (usuario: Usuario, poloId: string) => {
+    const novoPoloId = poloId || null;
+    const poloAnterior = usuario.poloId;
+    const poloNome = polos.find((p) => p.id === novoPoloId)?.nome;
+
+    setUsuarios((prev) =>
+      prev.map((u) =>
+        u.id === usuario.id ? { ...u, poloId: novoPoloId ?? undefined, poloNome } : u
+      )
+    );
+    setSavingId(usuario.id);
+
+    const { error } = await definirPoloUsuario(usuario.id, novoPoloId);
+    if (error) {
+      showToast(error, "error");
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.id === usuario.id
+            ? { ...u, poloId: poloAnterior, poloNome: usuario.poloNome }
+            : u
+        )
+      );
+    }
+    setSavingId(null);
+  };
+
   if (isLoading) {
     return (
       <div className="usuarios-loading">
@@ -277,28 +305,46 @@ const Usuarios: React.FC = () => {
                 </div>
 
                 {!isSelfAdmin ? (
-                  <div className="usuario-areas">
-                    {TODAS_AREAS.map((area) => {
-                      const ativo = usuario.areasPermitidas.includes(area);
-                      const limiteAtingido =
-                        !ativo && usuario.areasPermitidas.length >= MAX_AREAS_POR_COLABORADOR;
-                      return (
-                        <label
-                          key={area}
-                          className={`area-toggle ${ativo ? "active" : ""} ${limiteAtingido ? "disabled" : ""}`}
-                          title={limiteAtingido ? `Limite de ${MAX_AREAS_POR_COLABORADOR} áreas atingido` : undefined}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={ativo}
-                            disabled={savingId === usuario.id || usuario.status !== "aprovado" || limiteAtingido}
-                            onChange={() => toggleArea(usuario, area)}
-                          />
-                          {AREA_CONFIG[area].label}
-                        </label>
-                      );
-                    })}
-                  </div>
+                  <>
+                    <div className="usuario-areas">
+                      {TODAS_AREAS.map((area) => {
+                        const ativo = usuario.areasPermitidas.includes(area);
+                        const limiteAtingido =
+                          !ativo && usuario.areasPermitidas.length >= MAX_AREAS_POR_COLABORADOR;
+                        return (
+                          <label
+                            key={area}
+                            className={`area-toggle ${ativo ? "active" : ""} ${limiteAtingido ? "disabled" : ""}`}
+                            title={limiteAtingido ? `Limite de ${MAX_AREAS_POR_COLABORADOR} áreas atingido` : undefined}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={ativo}
+                              disabled={savingId === usuario.id || usuario.status !== "aprovado" || limiteAtingido}
+                              onChange={() => toggleArea(usuario, area)}
+                            />
+                            {AREA_CONFIG[area].label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="usuario-polo">
+                      <label htmlFor={`polo-${usuario.id}`}>Polo</label>
+                      <select
+                        id={`polo-${usuario.id}`}
+                        value={usuario.poloId || ""}
+                        disabled={savingId === usuario.id || usuario.status !== "aprovado"}
+                        onChange={(e) => alterarPolo(usuario, e.target.value)}
+                      >
+                        <option value="">Selecione um polo...</option>
+                        {polos.map((polo) => (
+                          <option key={polo.id} value={polo.id}>
+                            {polo.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
                 ) : (
                   <p className="usuario-areas-admin-note">Acesso total (admin)</p>
                 )}

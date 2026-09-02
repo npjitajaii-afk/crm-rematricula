@@ -2,11 +2,14 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { getCurrentUser, logoutUser } from "../services/authService";
+import { getPolos } from "../services/polosService";
+import { Polo } from "../types";
 import {
   UserPlus,
   Mail,
   Lock,
   User,
+  MapPin,
   AlertCircle,
   Loader2,
   Eye,
@@ -22,10 +25,20 @@ const Register: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [poloId, setPoloId] = useState("");
+  const [polos, setPolos] = useState<Polo[]>([]);
+  const [polosLoading, setPolosLoading] = useState(true);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [registrationPending, setRegistrationPending] = useState(false);
+
+  useEffect(() => {
+    getPolos().then(({ polos: lista }) => {
+      setPolos(lista);
+      setPolosLoading(false);
+    });
+  }, []);
 
   // Com a sessão temporária criada no cadastro, verificamos o profile até
   // que o administrador aprove a conta. Então encerramos essa sessão e
@@ -58,7 +71,7 @@ const Register: React.FC = () => {
     e.preventDefault();
     setError("");
 
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !password || !confirmPassword || !poloId) {
       setError("Por favor, preencha todos os campos");
       return;
     }
@@ -76,7 +89,7 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await register(name, email, password);
+      await register(name, email, password, poloId);
       setRegistrationPending(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar conta");
@@ -127,6 +140,28 @@ const Register: React.FC = () => {
               disabled={isLoading}
               autoComplete="name"
             />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="polo">
+              <MapPin size={18} />
+              Polo
+            </label>
+            <select
+              id="polo"
+              value={poloId}
+              onChange={(e) => setPoloId(e.target.value)}
+              disabled={isLoading || polosLoading}
+            >
+              <option value="">
+                {polosLoading ? "Carregando polos..." : "Selecione seu polo"}
+              </option>
+              {polos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="form-group">

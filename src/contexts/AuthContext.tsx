@@ -54,12 +54,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (
     name: string,
     email: string,
-    password: string
+    password: string,
+    poloId?: string
   ): Promise<void> => {
     const { user: newUser, error } = await registerUser(
       name,
       email,
-      password
+      password,
+      poloId
     );
 
     if (error === "EMAIL_CONFIRMATION_ENABLED") {

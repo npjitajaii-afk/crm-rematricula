@@ -286,7 +286,14 @@ const Colaboradores: React.FC = () => {
   const colaboradoresData = useMemo(() => {
     const map: Record<
       string,
-      { id: string; name: string; email: string; alunos: typeof alunos }
+      {
+        id: string;
+        name: string;
+        email: string;
+        poloId?: string;
+        poloNome?: string;
+        alunos: typeof alunos;
+      }
     > = {};
 
     // Inicializa todos os colaboradores registrados
@@ -396,6 +403,9 @@ const Colaboradores: React.FC = () => {
                       {colab.name.charAt(0).toUpperCase()}
                     </div>
                     <p className="colab-name">{colab.name}</p>
+                    {colab.poloNome && (
+                      <p className="colab-email">Polo: {colab.poloNome}</p>
+                    )}
                   </div>
 
                   <div className="colab-card-meta">

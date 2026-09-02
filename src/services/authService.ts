@@ -14,7 +14,12 @@ function mapProfileToUser(profile: {
   role?: string;
   status?: string;
   areas_permitidas?: string[] | null;
+  polo_id?: string | null;
+  polos?: { nome: string } | { nome: string }[] | null;
 }): User {
+  const poloJoin = profile.polos;
+  const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;
+
   return {
     id: profile.id,
     name: profile.name,
@@ -23,6 +28,8 @@ function mapProfileToUser(profile: {
     role: profile.role === "admin" ? "admin" : "colaborador",
     status: profile.status === "aprovado" || profile.status === "rejeitado" ? profile.status : "pendente",
     areasPermitidas: (profile.areas_permitidas ?? []) as User["areasPermitidas"],
+    poloId: profile.polo_id ?? undefined,
+    poloNome,
   };
 }
 
@@ -32,7 +39,7 @@ function mapProfileToUser(profile: {
 async function fetchProfile(userId: string): Promise<AuthResponse> {
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select('*, polos(nome)')
     .eq('id', userId)
     .single();
 
@@ -87,14 +94,15 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
 export async function registerUser(
   name: string,
   email: string,
-  password: string
+  password: string,
+  poloId?: string
 ): Promise<AuthResponse> {
   try {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name },
+        data: { name, polo_id: poloId ?? null },
       },
     });
 
@@ -113,6 +121,14 @@ export async function registerUser(
         user: null,
         error: 'EMAIL_CONFIRMATION_ENABLED',
       };
+    }
+
+    // Grava o polo_id no profile criado pelo trigger (que não inclui polo_id)
+    if (poloId) {
+      await supabase
+        .from('profiles')
+        .update({ polo_id: poloId })
+        .eq('id', data.user.id);
     }
 
     // O cadastro sempre começa como "pendente". Mantemos a sessão somente

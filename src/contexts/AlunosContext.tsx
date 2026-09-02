@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, ReactNode } from "react";
-import { Aluno, AlunoFilters, Interacao, PipelineStatusResumo, Area, AlunoStatus, CanalContato } from "../types";
+import { Aluno, AlunoFilters, Interacao, PipelineStatusResumo, Area, AlunoStatus, CanalContato, Polo } from "../types";
 import {
   getAlunos,
   getAlunoById,
@@ -16,6 +16,7 @@ import {
   getColaboradores as getColaboradoresService,
   addInteraction as addInteractionService,
 } from "../services/alunosService";
+import { getPolos as getPolosService } from "../services/polosService";
 import { useAuth } from "../hooks/useAuth";
 import { AlunosContext } from "./alunos-context";
 import {
@@ -38,8 +39,9 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   const [filters, setFilters] = useState<AlunoFilters>({});
   const [statusResumo, setStatusResumo] = useState<PipelineStatusResumo[]>([]);
   const [colaboradores, setColaboradores] = useState<
-    { id: string; name: string; email: string }[]
+    { id: string; name: string; email: string; poloId?: string; poloNome?: string }[]
   >([]);
+  const [polos, setPolos] = useState<Polo[]>([]);
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -64,6 +66,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         setAlunos([]);
         setStatusResumo([]);
         setColaboradores([]);
+        setPolos([]);
         setIsLoadingAlunos(false);
         return;
       }
@@ -119,6 +122,17 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
             }
           }
         }
+
+        {
+          const { polos: fetchedPolos, error: polosError } = await getPolosService();
+          if (!cancelado) {
+            if (polosError) {
+              console.error("Erro ao carregar polos:", polosError);
+            } else {
+              setPolos(fetchedPolos);
+            }
+          }
+        }
       } finally {
         // Rede de segurança: se não veio nenhum lote (ex: usuário sem
         // nenhum aluno cadastrado ainda), garante que o loading não fica
@@ -151,6 +165,12 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
           "createdBy" in newAluno && newAluno.createdBy
             ? newAluno.createdBy
             : user.id,
+        poloId:
+          "poloId" in newAluno && newAluno.poloId
+            ? newAluno.poloId
+            : !isAdmin && user.poloId
+            ? user.poloId
+            : undefined,
       };
 
       const { aluno, error } = await createAluno(alunoData);
@@ -164,7 +184,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         setAlunos((prev) => [aluno, ...prev]);
       }
     },
-    [user]
+    [user, isAdmin]
   );
 
   const updateAluno = useCallback(
@@ -380,6 +400,10 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
 
       if (filters.assignedTo) {
         if (aluno.assignedTo !== filters.assignedTo) return false;
+      }
+
+      if (filters.poloId) {
+        if (aluno.poloId !== filters.poloId) return false;
       }
 
       return true;
@@ -776,6 +800,10 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       .replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
     let ignored = 0;
+    const poloItajai = polos.find((p) =>
+      p.nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("itajai")
+    );
+
     const alunosData = jsonData.map((rawRow) => {
       const row = normalizeRow(rawRow as Record<string, unknown>);
       const campos = pickFields(row, ENGAJAMENTO_FIELD_SPECS);
@@ -810,6 +838,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         observations: observacoes || undefined,
         tags: [`Polo: ${polo}`, cpf && `CPF: ${cpf}`, tipoEntrada].filter(Boolean),
         createdBy: user.id,
+        ...(poloItajai ? { poloId: poloItajai.id } : {}),
       };
       return aluno;
     }).filter((aluno): aluno is Omit<Aluno, "id" | "createdAt" | "updatedAt" | "interactions"> => aluno !== null);
@@ -828,7 +857,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     if (createdAlunos.length > 0) setAlunos((prev) => [...createdAlunos, ...prev]);
     if (errors.length > 0) throw new Error(`Alguns lotes falharam ao importar: ${errors.join("; ")}`);
     return { imported: createdAlunos.length, ignored, duplicados };
-  }, [user]);
+  }, [user, polos]);
 
   // Otimização 5.1: também usa import dinâmico do xlsx na exportação.
   const exportAlunos = useCallback(async (): Promise<void> => {
@@ -887,6 +916,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       isAdmin,
       statusResumo,
       colaboradores,
+      polos,
     }),
     [
       alunos,
@@ -909,6 +939,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       isAdmin,
       statusResumo,
       colaboradores,
+      polos,
     ]
   );
 

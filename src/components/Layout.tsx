@@ -17,6 +17,7 @@ import {
   X,
   Send,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { Area } from "../types";
 import NotificacoesSininho from "./NotificacoesSininho";
@@ -125,18 +126,26 @@ const Layout: React.FC = () => {
       isActive: (p) => p === "/colaboradores",
     },
     {
+      path: "/polos",
+      icon: MapPin,
+      label: "Polos",
+      adminOnly: true,
+      adminOrder: 8,
+      isActive: (p) => p === "/polos",
+    },
+    {
       path: "/usuarios",
       icon: UserCog,
       label: "Usuários",
       adminOnly: true,
-      adminOrder: 8,
+      adminOrder: 9,
       isActive: (p) => p === "/usuarios",
     },
     {
       path: "/minha-area",
       icon: CircleUserRound,
       label: "Minha área",
-      adminOrder: 9,
+      adminOrder: 10,
       colabOrder: 5,
       isActive: (p) => p === "/minha-area",
     },

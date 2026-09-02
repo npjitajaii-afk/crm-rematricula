@@ -13,7 +13,7 @@ const AlunoForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getAluno, addAluno, updateAluno, isLoadingAlunos } = useAlunos();
+  const { getAluno, addAluno, updateAluno, isLoadingAlunos, isAdmin, polos } = useAlunos();
   const { user } = useAuth();
   const { showToast } = useToast();
   const isEditing = !!id;
@@ -64,9 +64,10 @@ const AlunoForm: React.FC = () => {
       value: existingAluno?.value?.toString() || "",
       observations: existingAluno?.observations || "",
       tags: existingAluno?.tags || ([] as string[]),
+      poloId: existingAluno?.poloId || polos[0]?.id || "",
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [existingAluno]
+    [existingAluno, polos]
   );
 
   const [formData, setFormData] = useState(buildFormData);
@@ -201,8 +202,10 @@ const AlunoForm: React.FC = () => {
       };
 
       if (isEditing) {
-        // Edição nunca muda a área do aluno — só o que já existe no form.
-        await updateAluno(id!, alunoData);
+        await updateAluno(id!, {
+          ...alunoData,
+          ...(isAdmin ? { poloId: formData.poloId || undefined } : {}),
+        });
         showToast("Aluno atualizado com sucesso!", "success");
         navigate(`/alunos/${id}`);
       } else {
@@ -212,6 +215,7 @@ const AlunoForm: React.FC = () => {
           statusAtualizadoEm: new Date(),
           createdBy: user.id,
           assignedTo: paraMim ? user.id : undefined,
+          ...(isAdmin && formData.poloId ? { poloId: formData.poloId } : {}),
         });
         showToast(
           paraMim ? "Contato criado e atribuído a você!" : "Aluno criado com sucesso!",

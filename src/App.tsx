@@ -25,6 +25,7 @@ const RiscoEvasao         = lazy(() => import("./pages/RiscoEvasao"));
 const MetricasDashboard   = lazy(() => import("./pages/MetricasDashboard"));
 const Grupos              = lazy(() => import("./pages/Grupos"));
 const Colaboradores       = lazy(() => import("./pages/Colaboradores"));
+const Polos               = lazy(() => import("./pages/Polos"));
 const Usuarios            = lazy(() => import("./pages/Usuarios"));
 const Retencao            = lazy(() => import("./pages/Retencao"));
 const Engajamento         = lazy(() => import("./pages/Engajamento"));
@@ -118,6 +119,7 @@ function App() {
                       <Route path="metricas" element={<AdminRoute><MetricasDashboard /></AdminRoute>} />
                       <Route path="grupos" element={<AdminRoute><Grupos /></AdminRoute>} />
                       <Route path="colaboradores" element={<AdminRoute><Colaboradores /></AdminRoute>} />
+                      <Route path="polos" element={<AdminRoute><Polos /></AdminRoute>} />
                       <Route path="usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
 
                       {/* Compatibilidade: quem tiver /funil-rematricula salvo cai no dashboard. */}

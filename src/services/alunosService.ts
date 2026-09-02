@@ -13,6 +13,7 @@ export interface AlunosResponse {
 
 const SELECT_WITH_INTERACOES = `
   *,
+  polos ( nome ),
   interacoes (
     id,
     tipo,
@@ -56,6 +57,9 @@ function sanitizarCampo(valor: string, limite: number, pegarPrimeiro = false): s
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapDatabaseToAluno(data: any): Aluno {
+  const poloJoin = data.polos;
+  const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;
+
   return {
     id: data.id,
     name: data.nome,
@@ -72,6 +76,8 @@ function mapDatabaseToAluno(data: any): Aluno {
     tags: data.tags || [],
     assignedTo: data.responsavel_id || undefined,
     matriculaVinculadaId: data.matricula_vinculada_id || undefined,
+    poloId: data.polo_id,
+    poloNome,
     createdBy: data.criado_por,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
@@ -308,6 +314,7 @@ export async function createAluno(
           tags: aluno.tags || [],
           responsavel_id: aluno.assignedTo || null,
           criado_por: aluno.createdBy,
+          ...(aluno.poloId ? { polo_id: aluno.poloId } : {}),
         },
       ])
       .select(SELECT_WITH_INTERACOES)
@@ -437,6 +444,7 @@ export async function createAlunosBulk(
     tags: aluno.tags || [],
     responsavel_id: aluno.assignedTo || null,
     criado_por: aluno.createdBy,
+    ...(aluno.poloId ? { polo_id: aluno.poloId } : {}),
   }));
 
   const batches: (typeof rows)[] = [];
@@ -533,6 +541,7 @@ export async function updateAluno(
     if (updates.observations !== undefined) updateData.observacoes = updates.observations || null;
     if (updates.tags !== undefined) updateData.tags = updates.tags || [];
     if (updates.assignedTo !== undefined) updateData.responsavel_id = updates.assignedTo || null;
+    if (updates.poloId !== undefined) updateData.polo_id = updates.poloId;
 
     const { data, error } = await supabase
       .from('alunos')
@@ -683,11 +692,14 @@ export async function getPipelineResumo(): Promise<{ resumo: PipelineStatusResum
 /**
  * Lista colaboradores (id/nome/email) pra tela de delegação do admin.
  */
-export async function getColaboradores(): Promise<{ colaboradores: { id: string; name: string; email: string }[]; error: string | null }> {
+export async function getColaboradores(): Promise<{
+  colaboradores: { id: string; name: string; email: string; poloId?: string; poloNome?: string }[];
+  error: string | null;
+}> {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, email')
+      .select('id, name, email, polo_id, polos(nome)')
       .order('name');
 
     if (error) {
@@ -695,7 +707,20 @@ export async function getColaboradores(): Promise<{ colaboradores: { id: string;
       return { colaboradores: [], error: error.message };
     }
 
-    return { colaboradores: data || [], error: null };
+    return {
+      colaboradores: (data || []).map((row) => {
+        const poloJoin = row.polos as { nome: string } | { nome: string }[] | null;
+        const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;
+        return {
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          poloId: row.polo_id ?? undefined,
+          poloNome,
+        };
+      }),
+      error: null,
+    };
   } catch {
     return { colaboradores: [], error: 'Erro ao buscar colaboradores' };
   }

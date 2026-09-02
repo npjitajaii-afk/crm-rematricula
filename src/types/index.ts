@@ -9,6 +9,12 @@ export type Area = "rematricula" | "retencao" | "engajamento";
 // rejeitado = cadastro recusado.
 export type StatusAprovacao = "pendente" | "aprovado" | "rejeitado";
 
+export interface Polo {
+  id: string;
+  nome: string;
+  createdAt: Date;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -19,6 +25,9 @@ export interface User {
   // Áreas que o colaborador pode ver/editar. Ignorado quando role = admin
   // (admin sempre tem acesso a todas as áreas).
   areasPermitidas: Area[];
+  /** Polo do colaborador. Admin pode ficar sem polo (vê todos). */
+  poloId?: string;
+  poloNome?: string;
 }
 
 export type StatusRematricula =
@@ -93,6 +102,8 @@ export interface Aluno {
   interactions: Interacao[];
   assignedTo?: string;
   createdBy: string;
+  poloId: string;
+  poloNome?: string;
   /** ID da matrícula vinculada — mesmo aluno, outro curso/edital. */
   matriculaVinculadaId?: string;
 }
@@ -105,6 +116,7 @@ export interface AlunoFilters {
   dateFrom?: Date;
   dateTo?: Date;
   assignedTo?: string;
+  poloId?: string;
 }
 
 export type ToastType = "success" | "error" | "info";
@@ -133,7 +145,7 @@ export interface ConfirmContextType {
 export interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, poloId?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -393,6 +405,8 @@ export interface Usuario {
   role: "admin" | "colaborador";
   status: StatusAprovacao;
   areasPermitidas: Area[];
+  poloId?: string;
+  poloNome?: string;
   createdAt: Date;
 }
 
@@ -443,5 +457,6 @@ export interface AlunosContextType {
   exportAlunos: () => void;
   isAdmin: boolean;
   statusResumo: PipelineStatusResumo[];
-  colaboradores: { id: string; name: string; email: string }[];
+  colaboradores: { id: string; name: string; email: string; poloId?: string; poloNome?: string }[];
+  polos: Polo[];
 }
