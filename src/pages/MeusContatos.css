@@ -33,3 +33,48 @@
   font-size: 0.875rem;
   white-space: nowrap;
 }
+
+/* Resultados da busca que pertencem a outro responsável */
+.meus-contatos-outros {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 169, 170, 0.08);
+  border: 1px solid rgba(0, 169, 170, 0.25);
+  border-radius: var(--radius-md);
+  max-width: 560px;
+}
+
+.meus-contatos-outros strong {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.meus-contatos-outros ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.meus-contatos-outros li {
+  margin-bottom: 0.25rem;
+}
+
+.meus-contatos-outros-nome {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-right: 0.35rem;
+}
+
+.meus-contatos-outros-meta {
+  color: var(--text-secondary);
+  margin-right: 0.25rem;
+}
+
+.meus-contatos-outros-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}

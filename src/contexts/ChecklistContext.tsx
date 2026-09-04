@@ -1,4 +1,5 @@
 import React, { useState, useEffect, ReactNode, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { ChecklistItem } from "../types";
 import {
   getTodosItensChecklist,
@@ -88,10 +89,23 @@ export const ChecklistProvider: React.FC<ChecklistProviderProps> = ({
     [resincronizarAluno]
   );
 
+  const { pathname } = useLocation();
+  // Checklist só é usado no funil de Engajamento (cards + modal).
+  // Não carrega nem abre realtime em Rematrícula/Retenção/outras rotas.
+  const precisaChecklist =
+    pathname.startsWith("/engajamento") ||
+    pathname.startsWith("/alunos/"); // detalhe/modal pode abrir checklist
+
   useEffect(() => {
     if (!user) {
       setItensPorAluno({});
       statusCarregamentoRef.current.clear();
+      return;
+    }
+
+    // Fora das rotas que usam checklist: não busca em massa nem realtime.
+    // Quem precisar de um aluno específico continua usando garantirItensCarregados.
+    if (!precisaChecklist) {
       return;
     }
 
@@ -121,11 +135,12 @@ export const ChecklistProvider: React.FC<ChecklistProviderProps> = ({
       setIsLoading(false);
     };
 
-    load();
+    // Defer: lista de alunos do funil tem prioridade na rede.
+    const defer = window.setTimeout(() => {
+      if (isMounted) load();
+    }, 350);
 
-    // Realtime: um único canal para toda a checklist (não é por aluno,
-    // pra não abrir dezenas de canais quando o Kanban tem muitos cards
-    // — ver decisão registrada no README-mudancas.md).
+    // Realtime só enquanto a tela de engajamento está aberta.
     const channel = supabase
       .channel("checklist-engajamento-realtime")
       .on(
@@ -148,9 +163,10 @@ export const ChecklistProvider: React.FC<ChecklistProviderProps> = ({
 
     return () => {
       isMounted = false;
+      window.clearTimeout(defer);
       supabase.removeChannel(channel);
     };
-  }, [user, resincronizarAluno]);
+  }, [user?.id, resincronizarAluno, precisaChecklist]);
 
   const toggleItem = async (item: ChecklistItem, concluido: boolean) => {
     if (!user) return;

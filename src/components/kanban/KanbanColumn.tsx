@@ -5,7 +5,7 @@ import { getStatusLabel } from "../../utils/formatters";
 import AlunoCard from "./AlunoCard";
 import "./KanbanColumn.css";
 
-const CARDS_POR_PAGINA = 10;
+const CARDS_POR_PAGINA = 40;
 
 interface KanbanColumnProps {
   status: AlunoStatus;
@@ -21,13 +21,13 @@ interface KanbanColumnProps {
    * reseta sozinha (drag/edição não deve esconder cards já carregados).
    */
   resetSignal?: string;
+  /** true enquanto qualquer card do board está sendo arrastado. */
+  isDragging?: boolean;
 }
 
 // Otimização (Bloco B): React.memo evita re-renderizar uma coluna inteira
 // quando a mudança foi em outra coluna. Só funciona de verdade porque
-// KanbanBoard agora memoiza o agrupamento por status (ver KanbanBoard.tsx)
-// — sem isso, o array `alunos` seria recriado a cada render e o memo não
-// pegaria nenhuma mudança.
+// KanbanBoard agora memoiza o agrupamento por status (ver KanbanBoard.tsx).
 const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   status,
   alunos,
@@ -35,14 +35,11 @@ const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   totalGeral,
   alertas,
   resetSignal,
+  isDragging = false,
 }) => {
   const outrosNaColuna =
     typeof totalGeral === "number" ? Math.max(totalGeral - alunos.length, 0) : 0;
 
-  // Performance: colunas com muitos alunos (ex: "Pendente de Contato" numa
-  // importação grande) só montam os primeiros 10 cards de cada vez, em vez
-  // de todos de uma vez — cada AlunoCard carrega bastante coisa (badges,
-  // ações, contexto). "Carregar mais" estende 10 em 10.
   const [visibleCount, setVisibleCount] = useState(CARDS_POR_PAGINA);
 
   useEffect(() => {
@@ -53,43 +50,52 @@ const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
   const restantes = alunos.length - alunosVisiveis.length;
 
   return (
-    <div className="kanban-column">
-      <div className="column-header" style={{ borderLeftColor: color }}>
-        <h3 className="column-title">{getStatusLabel(status)}</h3>
-        <span className="column-count">{alunos.length}</span>
-      </div>
+    <Droppable droppableId={status} direction="vertical">
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+          className={[
+            "kanban-column",
+            snapshot.isDraggingOver ? "kanban-column--drag-over" : "",
+            isDragging && !snapshot.isDraggingOver ? "kanban-column--drag-active" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <div className="column-header" style={{ borderLeftColor: color }}>
+            <h3 className="column-title">{getStatusLabel(status)}</h3>
+            <span className="column-count">{alunos.length}</span>
+          </div>
 
-      {outrosNaColuna > 0 && (
-        <div className="column-outros-info">
-          + {outrosNaColuna} de outros colaboradores
-        </div>
-      )}
+          {outrosNaColuna > 0 && (
+            <div className="column-outros-info">
+              + {outrosNaColuna} de outros colaboradores
+            </div>
+          )}
 
-      <Droppable droppableId={status}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={`column-content ${
-              snapshot.isDraggingOver ? "dragging-over" : ""
-            }`}
-          >
+          <div className="column-content">
             {alunos.length === 0 ? (
               <div className="empty-column">
-                <p>Nenhum aluno neste estágio</p>
+                <p>
+                  {snapshot.isDraggingOver
+                    ? "Solte aqui"
+                    : "Nenhum aluno neste estágio"}
+                </p>
               </div>
             ) : (
               alunosVisiveis.map((aluno, index) => (
                 <Draggable key={aluno.id} draggableId={aluno.id} index={index}>
-                  {(provided, snapshot) => (
+                  {(dragProvided, dragSnapshot) => (
                     <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
+                      ref={dragProvided.innerRef}
+                      {...dragProvided.draggableProps}
+                      {...dragProvided.dragHandleProps}
                       style={{
-                        ...provided.draggableProps.style,
-                        opacity: snapshot.isDragging ? 0.8 : 1,
+                        ...dragProvided.draggableProps.style,
+                        opacity: dragSnapshot.isDragging ? 0.9 : 1,
                       }}
+                      data-dragging={dragSnapshot.isDragging ? "true" : undefined}
                     >
                       <AlunoCard
                         aluno={aluno}
@@ -102,19 +108,19 @@ const KanbanColumn: React.FC<KanbanColumnProps> = React.memo(({
             )}
             {provided.placeholder}
           </div>
-        )}
-      </Droppable>
 
-      {restantes > 0 && (
-        <button
-          type="button"
-          className="btn btn-secondary kanban-carregar-mais"
-          onClick={() => setVisibleCount((v) => v + CARDS_POR_PAGINA)}
-        >
-          Carregar mais ({restantes} restantes)
-        </button>
+          {restantes > 0 && (
+            <button
+              type="button"
+              className="btn btn-secondary kanban-carregar-mais"
+              onClick={() => setVisibleCount((v) => v + CARDS_POR_PAGINA)}
+            >
+              Carregar mais ({restantes} restantes)
+            </button>
+          )}
+        </div>
       )}
-    </div>
+    </Droppable>
   );
 });
 

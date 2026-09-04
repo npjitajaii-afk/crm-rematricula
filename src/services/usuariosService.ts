@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Area, Usuario, StatusAprovacao } from '../types';
+import { Area, Usuario, StatusAprovacao, UserRole } from '../types';
 
 interface ProfileRow {
   id: string;
@@ -21,7 +21,7 @@ function mapRowToUsuario(row: ProfileRow): Usuario {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role === 'admin' ? 'admin' : 'colaborador',
+    role: row.role === 'admin' || row.role === 'supervisor' ? row.role : 'colaborador',
     status: (row.status as StatusAprovacao) ?? 'pendente',
     areasPermitidas: (row.areas_permitidas ?? []) as Area[],
     poloId: row.polo_id ?? undefined,
@@ -100,6 +100,37 @@ export async function definirAreasUsuario(
     return { error: null };
   } catch {
     return { error: 'Erro ao atualizar áreas do usuário' };
+  }
+}
+
+/**
+ * Altera o papel de acesso (role) de um usuário já aprovado.
+ * Regra de negócio: supervisor precisa ter um polo definido — não faz
+ * sentido um supervisor "de polo nenhum" (toda a lógica de RLS/métricas/
+ * delegação dele depende do polo). Essa checagem é feita aqui no client
+ * antes de gravar; o banco não recusa role='supervisor' sem polo_id
+ * (não há constraint pra isso hoje), então é importante não pular essa
+ * validação ao reusar esta função em outro lugar.
+ */
+export async function definirRoleUsuario(
+  userId: string,
+  role: UserRole,
+  poloIdAtual: string | null | undefined
+): Promise<{ error: string | null }> {
+  if (role === 'supervisor' && !poloIdAtual) {
+    return { error: 'Defina o polo do usuário antes de torná-lo supervisor.' };
+  }
+
+  try {
+    const { error } = await supabase.from('profiles').update({ role }).eq('id', userId);
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    return { error: null };
+  } catch {
+    return { error: 'Erro ao atualizar papel do usuário' };
   }
 }
 

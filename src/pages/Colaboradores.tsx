@@ -282,7 +282,9 @@ const Colaboradores: React.FC = () => {
   const [search, setSearch] = useState("");
   const [expandedColaborador, setExpandedColaborador] = useState<string | null>(null);
 
-  // Monta visão por colaborador
+  // Monta visão por colaborador — supervisor só enxerga colaboradores do próprio polo
+  // (o RLS do banco já filtra `alunos` e `colaboradores` por polo automaticamente;
+  // este filtro em JS é uma garantia extra de consistência no frontend)
   const colaboradoresData = useMemo(() => {
     const map: Record<
       string,
@@ -296,7 +298,7 @@ const Colaboradores: React.FC = () => {
       }
     > = {};
 
-    // Inicializa todos os colaboradores registrados
+    // Inicializa todos os colaboradores registrados (já filtrados por polo pelo RLS)
     colaboradores.forEach((c) => {
       map[c.id] = { ...c, alunos: [] };
     });

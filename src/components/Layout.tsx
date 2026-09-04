@@ -26,7 +26,7 @@ import "./Layout.css";
 
 const Layout: React.FC = () => {
   const { user, logout } = useAuth();
-  const { isAdmin, colaboradores } = useAlunos();
+  const { isAdmin, canGerenciarPolo, colaboradores } = useAlunos();
   const navigate = useNavigate();
   const location = useLocation();
   const [isRailOpen, setIsRailOpen] = useState(false);
@@ -37,18 +37,19 @@ const Layout: React.FC = () => {
     navigate("/login");
   };
 
-  // Cada item pode ter `adminOnly` (só admin vê, independente de área) ou
+  // Cada item pode ter `adminOnly` (gestão do polo: admin + supervisor) ou
   // `area` (colaborador só vê se o admin liberou aquela área pra ele).
   // Sem nenhum dos dois = visível pra todo mundo (ex: Minha área).
+  //
+  // Usuários e Polos são admin-only de verdade (path check no filter).
   //
   // "Rematrícula" passou a ser um único item de sidebar (em vez de dois:
   // Alunos + Risco de Evasão) — as duas telas agora vivem como abas dentro
   // dela (ver RematriculaTabs.tsx e App.tsx). O item leva pra /alunos (1ª
   // aba) e fica "ativo" também quando a rota é /risco-evasao.
   //
-  // A ordem do menu é diferente para admin e colaborador (pedido do
-  // usuário), por isso cada item tem `adminOrder` e `colabOrder` — só o
-  // primeiro é usado quando não houver o segundo (item admin-only).
+  // A ordem do menu é diferente para gestor (admin/supervisor) e colaborador
+  // (pedido do usuário), por isso cada item tem `adminOrder` e `colabOrder`.
   const allMenuItems: {
     path: string;
     icon: typeof Users;
@@ -154,13 +155,17 @@ const Layout: React.FC = () => {
   const menuItems = allMenuItems
     .filter((item) => {
       if (isAdmin) return true;
-      if (item.adminOnly) return false;
+      // Usuários e Polos: exclusivamente admin
+      if (item.path === "/usuarios" || item.path === "/polos") return false;
+      // Métricas, Colaboradores, Dashboard, Grupos: admin + supervisor
+      if (item.adminOnly) return !!canGerenciarPolo;
       if (item.area) return !!user?.areasPermitidas?.includes(item.area);
       return true;
     })
     .sort((a, b) => {
-      const orderA = isAdmin ? a.adminOrder : a.colabOrder ?? a.adminOrder;
-      const orderB = isAdmin ? b.adminOrder : b.colabOrder ?? b.adminOrder;
+      const useGestorOrder = isAdmin || !!canGerenciarPolo;
+      const orderA = useGestorOrder ? a.adminOrder : a.colabOrder ?? a.adminOrder;
+      const orderB = useGestorOrder ? b.adminOrder : b.colabOrder ?? b.adminOrder;
       return orderA - orderB;
     });
 
@@ -205,7 +210,11 @@ const Layout: React.FC = () => {
             <div className="rail-user-text">
               <span className="rail-user-name">{user?.name}</span>
               <span className="rail-user-role">
-                {isAdmin ? "Admin" : "Colaborador"}
+                {user?.role === "admin"
+                  ? "Admin"
+                  : user?.role === "supervisor"
+                  ? "Supervisor"
+                  : "Colaborador"}
               </span>
             </div>
           </div>

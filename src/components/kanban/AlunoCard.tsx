@@ -92,7 +92,31 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   // controle operacional pedido pelo usuário, válido nos 3 funis.
   const responsavelNome = colaboradores.find((c) => c.id === aluno.assignedTo)?.name;
 
+  // Distingue clique de drag: se o ponteiro se moveu mais que alguns
+  // pixels, não abre o modal (evita abrir o painel logo após soltar o card).
+  const pointerStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const foiDragRef = React.useRef(false);
+
+  const handlePointerDownCard = (e: React.PointerEvent) => {
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    foiDragRef.current = false;
+  };
+
+  const handlePointerMoveCard = (e: React.PointerEvent) => {
+    const start = pointerStartRef.current;
+    if (!start) return;
+    const dx = Math.abs(e.clientX - start.x);
+    const dy = Math.abs(e.clientY - start.y);
+    if (dx > 6 || dy > 6) {
+      foiDragRef.current = true;
+    }
+  };
+
   const handleClick = () => {
+    if (foiDragRef.current) {
+      foiDragRef.current = false;
+      return;
+    }
     setExpandedAlunoId(aluno.id);
   };
 
@@ -121,7 +145,14 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
     <div
       className="lead-card"
       onClick={handleClick}
-      onPointerDown={expandedAlunoId ? (e) => e.stopPropagation() : undefined}
+      onPointerDown={(e) => {
+        if (expandedAlunoId) {
+          e.stopPropagation();
+          return;
+        }
+        handlePointerDownCard(e);
+      }}
+      onPointerMove={handlePointerMoveCard}
     >
       <div className="lead-card-header">
         <h4 className="lead-name">{aluno.name}</h4>

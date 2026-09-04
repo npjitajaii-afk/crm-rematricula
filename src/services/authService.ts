@@ -25,7 +25,7 @@ function mapProfileToUser(profile: {
     name: profile.name,
     email: profile.email,
     avatarUrl: profile.avatar_url,
-    role: profile.role === "admin" ? "admin" : "colaborador",
+    role: profile.role === "admin" || profile.role === "supervisor" ? profile.role : "colaborador",
     status: profile.status === "aprovado" || profile.status === "rejeitado" ? profile.status : "pendente",
     areasPermitidas: (profile.areas_permitidas ?? []) as User["areasPermitidas"],
     poloId: profile.polo_id ?? undefined,
@@ -58,11 +58,25 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      return { user: null, error: 'Email ou senha incorretos' };
+      // Supabase retorna "Invalid login credentials" para senha errada E para
+      // e-mail não confirmado — diferenciamos pela mensagem do próprio Supabase.
+      const msg = error.message?.toLowerCase() ?? "";
+      if (msg.includes("email not confirmed")) {
+        return {
+          user: null,
+          error:
+            "Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada ou desative a confirmação de e-mail no Supabase.",
+        };
+      }
+      if (msg.includes("invalid login credentials") || msg.includes("invalid email or password")) {
+        return { user: null, error: "Email ou senha incorretos" };
+      }
+      // Outros erros (rate limit, rede etc.) — mostra a mensagem real para facilitar diagnóstico
+      return { user: null, error: error.message };
     }
 
     if (!data.user) {
-      return { user: null, error: 'Falha ao autenticar usuário' };
+      return { user: null, error: "Falha ao autenticar usuário" };
     }
 
     const result = await fetchProfile(data.user.id);

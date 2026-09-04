@@ -1,4 +1,5 @@
 import React, { useState, useEffect, ReactNode, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { WhatsappResumo } from "../types";
 import {
   getResumoWhatsappTodosAlunos,
@@ -30,6 +31,16 @@ export const WhatsappProvider: React.FC<WhatsappProviderProps> = ({
   );
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  // Badges de WhatsApp aparecem nos cards do Kanban (todas as áreas de funil).
+  // Fora dessas rotas não precisamos do resumo em massa nem do canal realtime.
+  const precisaWhatsapp =
+    pathname.startsWith("/alunos") ||
+    pathname.startsWith("/meus-contatos") ||
+    pathname.startsWith("/engajamento") ||
+    pathname.startsWith("/retencao") ||
+    pathname.startsWith("/risco-evasao") ||
+    pathname.startsWith("/rematricula");
 
   const resincronizarAluno = useCallback(async (alunoId: string) => {
     const { resumo } = await getResumoWhatsappPorAluno(alunoId);
@@ -40,6 +51,13 @@ export const WhatsappProvider: React.FC<WhatsappProviderProps> = ({
   useEffect(() => {
     if (!user) {
       setResumoPorAluno({});
+      return;
+    }
+
+    // Fora das telas de funil: não carrega resumo em massa nem realtime.
+    // O resumo de um aluno específico ainda pode ser buscado sob demanda
+    // via resincronizarAluno se algum componente chamar.
+    if (!precisaWhatsapp) {
       return;
     }
 
@@ -56,7 +74,11 @@ export const WhatsappProvider: React.FC<WhatsappProviderProps> = ({
       setIsLoading(false);
     };
 
-    load();
+    // Atrasa um pouco a carga em massa pro getAlunos (lista leve) ganhar
+    // a disputa de rede logo após o login / troca de funil.
+    const defer = window.setTimeout(() => {
+      if (isMounted) load();
+    }, 400);
 
     // Um único canal de realtime para toda a base — cada mensagem nova
     // (INSERT) ou marcação de lida (UPDATE) só re-sincroniza o resumo
@@ -83,9 +105,10 @@ export const WhatsappProvider: React.FC<WhatsappProviderProps> = ({
 
     return () => {
       isMounted = false;
+      window.clearTimeout(defer);
       supabase.removeChannel(channel);
     };
-  }, [user, resincronizarAluno]);
+  }, [user?.id, resincronizarAluno, precisaWhatsapp]);
 
   const marcarComoLida = async (alunoId: string) => {
     // Otimista: zera o badge na hora, o colaborador já abriu o card/tela.

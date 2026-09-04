@@ -9,6 +9,13 @@ export type Area = "rematricula" | "retencao" | "engajamento";
 // rejeitado = cadastro recusado.
 export type StatusAprovacao = "pendente" | "aprovado" | "rejeitado";
 
+// Papel de acesso (ver 019_supervisor_e_isolamento_polo.sql).
+// admin: vê/autoriza tudo, todos os polos.
+// supervisor: vê/exclui/delega contatos e métricas só do próprio polo,
+//   não autoriza usuários. Precisa ter poloId definido.
+// colaborador: só os próprios contatos, dentro do polo.
+export type UserRole = "admin" | "supervisor" | "colaborador";
+
 export interface Polo {
   id: string;
   nome: string;
@@ -20,7 +27,7 @@ export interface User {
   name: string;
   email: string;
   avatarUrl?: string | null;
-  role: "admin" | "colaborador";
+  role: UserRole;
   status: StatusAprovacao;
   // Áreas que o colaborador pode ver/editar. Ignorado quando role = admin
   // (admin sempre tem acesso a todas as áreas).
@@ -402,7 +409,7 @@ export interface Usuario {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "colaborador";
+  role: UserRole;
   status: StatusAprovacao;
   areasPermitidas: Area[];
   poloId?: string;
@@ -456,6 +463,9 @@ export interface AlunosContextType {
   ) => Promise<{ imported: number; ignored: number; duplicados: number }>;
   exportAlunos: () => void;
   isAdmin: boolean;
+  isSupervisor: boolean;
+  /** true para quem pode gerenciar o polo inteiro: admin ou supervisor */
+  canGerenciarPolo: boolean;
   statusResumo: PipelineStatusResumo[];
   colaboradores: { id: string; name: string; email: string; poloId?: string; poloNome?: string }[];
   polos: Polo[];

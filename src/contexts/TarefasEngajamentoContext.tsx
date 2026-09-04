@@ -27,9 +27,22 @@ export const TarefasEngajamentoProvider: React.FC<{ children: ReactNode }> = ({ 
       const next = [...current]; next[index] = tarefa; return next;
     });
   }, [area, load]);
-  useEffect(() => { if (!user) { setTarefas([]); return; } load(); }, [user, load]);
+  // Só carrega tarefas/agenda nas rotas que realmente usam essas telas.
+  // Evita query + canal realtime em login, Kanban, métricas etc.
+  const precisaTarefas =
+    pathname.includes("/tarefas") ||
+    pathname.includes("/painel-tarefas") ||
+    pathname.includes("/agenda") ||
+    pathname.includes("/calendario");
+
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setTarefas([]); return; }
+    if (!precisaTarefas) return;
+    load();
+  }, [user, load, precisaTarefas]);
+
+  useEffect(() => {
+    if (!user || !precisaTarefas) return;
     const channel = supabase.channel(`tarefas-${area}-realtime`)
       .on("postgres_changes", { event: "*", schema: "public", table: `${area}_tarefas_pessoais` }, (payload) => {
         const id = (payload.new as { id?: string }).id || (payload.old as { id?: string }).id;
@@ -40,7 +53,7 @@ export const TarefasEngajamentoProvider: React.FC<{ children: ReactNode }> = ({ 
         if (id) resync(id);
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [area, load, resync, user]);
+  }, [area, load, resync, user, precisaTarefas]);
   const criarTarefa = async (dados: { titulo: string; anotacoes?: string; alunoId?: string; prazo?: Date; checklist?: { texto: string }[] }) => {
     if (!user) return; const { tarefa, error } = await criarTarefaPessoal(user.id, dados, area);
     if (error || !tarefa) throw new Error(error || "Erro ao criar tarefa"); setTarefas((current) => [tarefa, ...current]);

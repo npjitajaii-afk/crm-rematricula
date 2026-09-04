@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { Search, Plus, Sparkles, MoveHorizontal, Upload, Trash2 } from "lucide-react";
+import SearchBox from "../components/SearchBox";
 import { AREA_CONFIG } from "../config/areas";
 import { getStatusLabel, getSourceLabel } from "../utils/formatters";
 import AlunoSwipeRow from "../components/AlunoSwipeRow";
@@ -232,15 +233,11 @@ const Engajamento: React.FC = () => {
       </div>
 
       <div className="leads-toolbar">
-        <div className="search-box">
-          <Search size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por nome, email, RA, curso..."
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-        </div>
+        <SearchBox
+        placeholder="Buscar por nome, email, RA, curso..."
+        value={searchTerm}
+        onChange={handleSearch}
+      />
       </div>
 
       {/* Lista de Alunos: sem Kanban, cada linha é arrastada pro lado

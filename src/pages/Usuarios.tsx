@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getUsuarios, definirStatusUsuario, definirAreasUsuario, definirPoloUsuario } from "../services/usuariosService";
-import { Usuario, Area } from "../types";
+import { getUsuarios, definirStatusUsuario, definirAreasUsuario, definirPoloUsuario, definirRoleUsuario } from "../services/usuariosService";
+import { Usuario, Area, UserRole } from "../types";
 import { AREA_CONFIG } from "../config/areas";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
@@ -23,6 +23,15 @@ const TODAS_AREAS: Area[] = ["rematricula", "retencao", "engajamento"];
  * simultaneamente (nem todos têm acesso a duas — pode ser só 1). Ver
  * README.md, Bloco C. */
 const MAX_AREAS_POR_COLABORADOR = 2;
+
+/** Role "admin" não aparece no seletor — só existe um admin (já vinculado
+ * a um polo) e promover alguém a admin é uma decisão manual (SQL), fora
+ * desta tela. Aqui o admin só alterna entre supervisor e colaborador. */
+const ROLE_LABELS: Record<UserRole, string> = {
+  admin: "Administrador",
+  supervisor: "Supervisor",
+  colaborador: "Colaborador",
+};
 
 const STATUS_INFO: Record<Usuario["status"], { label: string; className: string }> = {
   pendente: { label: "Pendente", className: "status-chip-pendente" },
@@ -167,6 +176,12 @@ const Usuarios: React.FC = () => {
 
   const alterarPolo = async (usuario: Usuario, poloId: string) => {
     const novoPoloId = poloId || null;
+
+    if (usuario.role === "supervisor" && !novoPoloId) {
+      showToast("Não é possível tirar o polo de um supervisor. Rebaixe para colaborador antes, se necessário.", "error");
+      return;
+    }
+
     const poloAnterior = usuario.poloId;
     const poloNome = polos.find((p) => p.id === novoPoloId)?.nome;
 
@@ -187,6 +202,26 @@ const Usuarios: React.FC = () => {
             : u
         )
       );
+    }
+    setSavingId(null);
+  };
+
+  const alterarRole = async (usuario: Usuario, novoRole: UserRole) => {
+    if (novoRole === "supervisor" && !usuario.poloId) {
+      showToast("Defina o polo do usuário antes de torná-lo supervisor.", "error");
+      return;
+    }
+
+    const roleAnterior = usuario.role;
+    setUsuarios((prev) => prev.map((u) => (u.id === usuario.id ? { ...u, role: novoRole } : u)));
+    setSavingId(usuario.id);
+
+    const { error } = await definirRoleUsuario(usuario.id, novoRole, usuario.poloId ?? null);
+    if (error) {
+      showToast(error, "error");
+      setUsuarios((prev) => prev.map((u) => (u.id === usuario.id ? { ...u, role: roleAnterior } : u)));
+    } else {
+      showToast(`${usuario.name} agora é ${ROLE_LABELS[novoRole]}`, "success");
     }
     setSavingId(null);
   };
@@ -306,6 +341,23 @@ const Usuarios: React.FC = () => {
 
                 {!isSelfAdmin ? (
                   <>
+                    <div className="usuario-polo">
+                      <label htmlFor={`role-${usuario.id}`}>Nível de acesso</label>
+                      <select
+                        id={`role-${usuario.id}`}
+                        value={usuario.role}
+                        disabled={savingId === usuario.id || usuario.status !== "aprovado"}
+                        onChange={(e) => alterarRole(usuario, e.target.value as UserRole)}
+                      >
+                        <option value="colaborador">{ROLE_LABELS.colaborador}</option>
+                        <option value="supervisor">{ROLE_LABELS.supervisor}</option>
+                      </select>
+                      {usuario.role === "supervisor" && !usuario.poloId && (
+                        <p className="usuario-role-aviso">
+                          Defina um polo abaixo — supervisor sem polo não consegue acessar o sistema corretamente.
+                        </p>
+                      )}
+                    </div>
                     <div className="usuario-areas">
                       {TODAS_AREAS.map((area) => {
                         const ativo = usuario.areasPermitidas.includes(area);

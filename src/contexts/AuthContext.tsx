@@ -8,6 +8,7 @@ import {
   onAuthStateChange,
 } from "../services/authService";
 import { AuthContext } from "./auth-context";
+import { supabase } from "../lib/supabase";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -31,7 +32,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(updatedUser);
     });
 
-    return unsubscribe;
+    // Realtime: relê o profile quando o admin muda role/status/polo do usuário
+    // logado — sem isso o usuário precisaria fazer logout e login de novo para
+    // enxergar a mudança (ex: ser promovido a supervisor, ter acesso aprovado).
+    let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) return;
+
+      realtimeChannel = supabase
+        .channel("profile-self")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "profiles",
+            filter: `id=eq.${session.user.id}`,
+          },
+          async () => {
+            // Profile mudou no banco → relê e atualiza o contexto imediatamente
+            const { user: refreshed } = await getCurrentUser();
+            setUser(refreshed);
+          }
+        )
+        .subscribe();
+    });
+
+    return () => {
+      unsubscribe();
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (email: string, password: string): Promise<void> => {

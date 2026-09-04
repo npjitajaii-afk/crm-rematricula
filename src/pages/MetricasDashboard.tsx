@@ -176,7 +176,11 @@ interface AreaDashboardProps {
 }
 
 const AreaDashboard: React.FC<AreaDashboardProps> = ({ area }) => {
-  const { isAdmin } = useAuth();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const isSupervisor = user?.role === "supervisor";
+  // Admin e supervisor veem o ranking de colaboradores (cada um filtrado pelo banco ao seu polo)
+  const canVerRanking = isAdmin || isSupervisor;
   const { showToast } = useToast();
   const labels = AREA_LABELS[area];
 
@@ -196,7 +200,7 @@ const AreaDashboard: React.FC<AreaDashboardProps> = ({ area }) => {
         getMetricasGerais(area),
         getPipelineResumo(area),
         getMetricasCanais(area),
-        isAdmin ? getMetricasColaboradores(area) : Promise.resolve(null),
+        canVerRanking ? getMetricasColaboradores(area) : Promise.resolve(null),
       ]);
 
       if (!isMounted) return;
@@ -225,7 +229,7 @@ const AreaDashboard: React.FC<AreaDashboardProps> = ({ area }) => {
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [area, isAdmin]);
+  }, [area, canVerRanking]);
 
   if (isLoading && !gerais) {
     return <div className="metricas-loading">Carregando métricas...</div>;
@@ -294,7 +298,7 @@ const AreaDashboard: React.FC<AreaDashboardProps> = ({ area }) => {
           </div>
         </div>
 
-        {isAdmin && (gerais?.alunosSemResponsavel ?? 0) > 0 && (
+        {canVerRanking && (gerais?.alunosSemResponsavel ?? 0) > 0 && (
           <div className="kpi-card kpi-card-alert">
             <div className="kpi-icon kpi-icon-warning">
               <AlertTriangle size={20} />
@@ -333,7 +337,7 @@ const AreaDashboard: React.FC<AreaDashboardProps> = ({ area }) => {
         )}
       </div>
 
-      {isAdmin && (
+      {canVerRanking && (
         <div className="metricas-section">
           <h2>Ranking de colaboradores</h2>
           {colaboradores.length === 0 ? (

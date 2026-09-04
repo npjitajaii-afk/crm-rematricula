@@ -13,6 +13,7 @@ import { AgendaEngajamentoProvider } from "./contexts/AgendaEngajamentoContext";
 import PrivateRoute from "./components/PrivateRoute";
 import AreaRoute from "./components/AreaRoute";
 import AdminRoute from "./components/AdminRoute";
+import GestorRoute from "./components/GestorRoute";
 import IndexRedirect from "./components/IndexRedirect";
 import Layout from "./components/Layout";
 
@@ -94,21 +95,10 @@ function App() {
                     >
                       <Route index element={<IndexRedirect />} />
 
-                      {/* Funil de Rematrícula: "Alunos", "Meus Contatos" e "Risco de
-                          Evasão" agora são abas dentro da mesma seção "Rematrícula" na
-                          sidebar (ver RematriculaTabs.tsx e Layout.tsx), então as três
-                          seguem a mesma regra de acesso: liberado pra admin e pra
-                          colaborador com a área "rematricula" liberada. As demais
-                          rotas seguem como estavam:
-                            dashboard      -> AdminRoute
-                            alunos         -> AreaRoute area="rematricula"
-                            meus-contatos  -> AreaRoute area="rematricula"
-                            risco-evasao   -> AreaRoute area="rematricula"
-                            metricas       -> AdminRoute
-                            grupos         -> AdminRoute
-                            colaboradores  -> AdminRoute
-                            usuarios       -> AdminRoute */}
-                      <Route path="dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
+                      {/* Gestão do polo: admin + supervisor (GestorRoute).
+                          Usuários e Polos: só admin (AdminRoute).
+                          Funis: AreaRoute conforme área liberada. */}
+                      <Route path="dashboard" element={<GestorRoute><Dashboard /></GestorRoute>} />
                       <Route path="alunos" element={<AreaRoute area="rematricula"><Alunos /></AreaRoute>} />
                       <Route path="meus-contatos" element={<AreaRoute area="rematricula"><MeusContatos /></AreaRoute>} />
                       <Route path="risco-evasao" element={<AreaRoute area="rematricula"><RiscoEvasao /></AreaRoute>} />
@@ -116,9 +106,9 @@ function App() {
                       <Route path="rematricula/agenda" element={<AreaRoute area="rematricula"><AgendaEngajamento area="rematricula" /></AreaRoute>} />
                       <Route path="rematricula/calendario" element={<AreaRoute area="rematricula"><CalendarioGeral /></AreaRoute>} />
                       <Route path="rematricula/painel-tarefas" element={<AreaRoute area="rematricula"><PainelTarefasGeral /></AreaRoute>} />
-                      <Route path="metricas" element={<AdminRoute><MetricasDashboard /></AdminRoute>} />
-                      <Route path="grupos" element={<AdminRoute><Grupos /></AdminRoute>} />
-                      <Route path="colaboradores" element={<AdminRoute><Colaboradores /></AdminRoute>} />
+                      <Route path="metricas" element={<GestorRoute><MetricasDashboard /></GestorRoute>} />
+                      <Route path="grupos" element={<GestorRoute><Grupos /></GestorRoute>} />
+                      <Route path="colaboradores" element={<GestorRoute><Colaboradores /></GestorRoute>} />
                       <Route path="polos" element={<AdminRoute><Polos /></AdminRoute>} />
                       <Route path="usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
 

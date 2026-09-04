@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAlunos } from "../hooks/useAlunos";
 import { Search, LifeBuoy } from "lucide-react";
+import SearchBox from "../components/SearchBox";
 import KanbanBoard from "../components/kanban/KanbanBoard";
 import "./Alunos.css";
 
@@ -37,15 +38,11 @@ const Retencao: React.FC = () => {
       </div>
 
       <div className="leads-toolbar">
-        <div className="search-box">
-          <Search size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por nome, email, RA, curso..."
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-        </div>
+        <SearchBox
+        placeholder="Buscar por nome, email, RA, curso..."
+        value={searchTerm}
+        onChange={handleSearch}
+      />
       </div>
 
       <KanbanBoard area="retencao" />

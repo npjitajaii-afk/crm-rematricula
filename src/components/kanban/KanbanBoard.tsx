@@ -43,6 +43,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const animacaoAutoScrollRef = useRef<number | null>(null);
   const panRef = useRef<{ pointerId: number; startX: number; startScrollLeft: number } | null>(null);
   const [arrastandoQuadro, setArrastandoQuadro] = useState(false);
+  // Enquanto um card está sendo arrastado, as colunas mostram TODOS os
+  // alunos (não só a página de 10). Sem isso o @hello-pangea/dnd calcula
+  // índices errados e o card às vezes cai na coluna/posição errada.
+  const [arrastandoCard, setArrastandoCard] = useState(false);
 
   const config = AREA_CONFIG[area];
   const statuses = config.statuses;
@@ -120,6 +124,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const handleDragEnd = async (result: DropResult) => {
     arrastandoCardRef.current = false;
+    setArrastandoCard(false);
     ponteiroXRef.current = null;
     if (animacaoAutoScrollRef.current) {
       cancelAnimationFrame(animacaoAutoScrollRef.current);
@@ -127,17 +132,30 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
     const { destination, source, draggableId } = result;
 
+    // Soltou fora de qualquer coluna, ou na mesma posição — não faz nada.
+    if (!destination) return;
     if (
-      !destination ||
-      (destination.droppableId === source.droppableId &&
-        destination.index === source.index)
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
     ) {
       return;
     }
 
+    // Mesma coluna: só reordenação visual (não persistimos ordem no banco).
+    if (destination.droppableId === source.droppableId) {
+      return;
+    }
+
     const newStatus = destination.droppableId as AlunoStatus;
+    // Segurança: só aceita status que realmente existem neste funil.
+    // Evita gravar um droppableId inesperado se o DOM/estado estiver inconsistente.
+    if (!statuses.includes(newStatus)) {
+      console.warn("Drop em status inválido para a área:", newStatus, area);
+      return;
+    }
 
     try {
+      // updateAluno é otimista — o card já some da coluna de origem na hora.
       await updateAluno(draggableId, { status: newStatus });
     } catch (error) {
       console.error("Erro ao atualizar status do aluno:", error);
@@ -147,6 +165,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const handleDragStart = () => {
     arrastandoCardRef.current = true;
+    setArrastandoCard(true);
   };
 
   // O auto-scroll nativo da biblioteca não alcança consistentemente o
@@ -189,9 +208,16 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }, []);
 
   const handlePanStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    // Enquanto um card está sendo arrastado, o pan do quadro NÃO pode
+    // capturar o ponteiro — senão o @hello-pangea/dnd perde o hit-test
+    // nas colunas e o isDraggingOver fica intermitente.
+    if (arrastandoCardRef.current) return;
+
     // Cards continuam reservados ao drag-and-drop do Kanban. O restante do
     // quadro pode ser clicado e arrastado para navegar entre as colunas.
-    if ((event.target as HTMLElement).closest("[data-rfd-draggable-id], [data-rbd-draggable-id]")) return;
+    if ((event.target as HTMLElement).closest(
+      "[data-rfd-draggable-id], [data-rbd-draggable-id], .lead-card"
+    )) return;
     // Modais renderizados via portal ficam no document.body (fora do DOM
     // real do wrapper), mas o React ainda entrega eventos pelo tree de
     // componentes. Se o clique veio de dentro de um overlay ou modal,
@@ -209,6 +235,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   const handlePanMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (arrastandoCardRef.current) return;
     const pan = panRef.current;
     if (!pan || pan.pointerId !== event.pointerId) return;
     const deslocamento = event.clientX - pan.startX;
@@ -225,7 +252,13 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   return (
     <div
       ref={boardWrapperRef}
-      className={`kanban-board-wrapper${arrastandoQuadro ? " kanban-board-wrapper--panning" : ""}`}
+      className={[
+        "kanban-board-wrapper",
+        arrastandoQuadro ? "kanban-board-wrapper--panning" : "",
+        arrastandoCard ? "kanban-board-wrapper--card-dragging" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       onPointerDown={handlePanStart}
       onPointerMove={handlePanMove}
       onPointerUp={handlePanEnd}
@@ -242,6 +275,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
               totalGeral={isAdmin ? undefined : getTotalByStatus(status)}
               alertas={alertas}
               resetSignal={searchTerm}
+              isDragging={arrastandoCard}
             />
           ))}
         </div>

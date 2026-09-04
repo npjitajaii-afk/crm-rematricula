@@ -20,8 +20,10 @@ export async function getPipelineResumo(
   area: Area
 ): Promise<{ data: PipelineStatusResumo[]; error: string | null }> {
   try {
+    // pipeline_area_resumo não tinha isolamento por polo — trocado pela
+    // RPC equivalente (migration 020).
     const { data, error } = await supabase
-      .from("pipeline_area_resumo")
+      .rpc("pipeline_area_polo")
       .select("status, total, total_valor_pendente")
       .eq("area", area);
 
@@ -122,8 +124,7 @@ export async function getMetricasColaboradores(
 ): Promise<{ data: MetricaColaborador[]; error: string | null }> {
   try {
     const { data, error } = await supabase
-      .from("metricas_colaboradores_area")
-      .select("*")
+      .rpc("metricas_colaboradores_polo")
       .eq("area", area)
       .order("sucesso", { ascending: false });
 
@@ -163,8 +164,7 @@ export async function getMetricasCanais(
 ): Promise<{ data: MetricaCanal[]; error: string | null }> {
   try {
     const { data, error } = await supabase
-      .from("metricas_canais_area")
-      .select("*")
+      .rpc("metricas_canais_polo")
       .eq("area", area)
       .order("total", { ascending: false });
 
@@ -197,7 +197,7 @@ export async function getMetricasCanaisCruzado(): Promise<{
   error: string | null;
 }> {
   try {
-    const { data, error } = await supabase.from("metricas_canais_area").select("*");
+    const { data, error } = await supabase.rpc("metricas_canais_polo");
 
     if (error) {
       console.error("Erro ao buscar métricas de canal cruzadas:", error);
@@ -240,8 +240,8 @@ export async function getOverviewGeral(): Promise<{
 }> {
   try {
     const [overviewRes, alertasRes] = await Promise.all([
-      supabase.from("metricas_overview_geral").select("area, total"),
-      supabase.from("alertas_operacao_resumo").select("area, travados"),
+      supabase.rpc("metricas_overview_polo").select("area, total"),
+      supabase.rpc("alertas_operacao_polo").select("area, travados"),
     ]);
 
     if (overviewRes.error) {

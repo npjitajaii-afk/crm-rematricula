@@ -14,6 +14,7 @@ import {
   Trash2,
   MoveHorizontal,
 } from "lucide-react";
+import SearchBox from "../components/SearchBox";
 import AlunoSwipeRow from "../components/AlunoSwipeRow";
 import RematriculaTabs from "../components/RematriculaTabs";
 import AlunoExpandModal from "../components/AlunoExpandModal";
@@ -31,7 +32,7 @@ const Alunos: React.FC = () => {
     deleteAluno,
     deleteAlunosBulk,
     assumirAluno,
-    isAdmin,
+    canGerenciarPolo,
     colaboradores,
   } = useAlunos();
 
@@ -250,13 +251,19 @@ const Alunos: React.FC = () => {
   };
 
   const handleBulkDelete = async () => {
+    const qtd = selectedIds.length;
     const confirmed = await confirm(
-      `Tem certeza que deseja excluir ${selectedIds.length} aluno(s) selecionado(s)? Essa ação não pode ser desfeita.`,
-      { confirmLabel: "Excluir todos" }
+      qtd > 100
+        ? `Você está prestes a excluir ${qtd} alunos. A exclusão será feita em lotes e pode levar alguns segundos. Essa ação não pode ser desfeita.`
+        : `Tem certeza que deseja excluir ${qtd} aluno(s) selecionado(s)? Essa ação não pode ser desfeita.`,
+      { confirmLabel: qtd > 100 ? `Excluir ${qtd} alunos` : "Excluir todos" }
     );
     if (!confirmed) return;
 
     try {
+      if (qtd > 50) {
+        showToast(`Excluindo ${qtd} alunos em lotes...`, "info");
+      }
       const deletedCount = await deleteAlunosBulk(selectedIds);
       setSelectedIds([]);
 
@@ -290,7 +297,7 @@ const Alunos: React.FC = () => {
           </p>
         </div>
         <div className="leads-actions">
-          {isAdmin && selectedIds.length > 0 && (
+          {canGerenciarPolo && selectedIds.length > 0 && (
             <button className="btn btn-danger" onClick={handleBulkDelete}>
               <Trash2 size={18} />
               Excluir selecionados ({selectedIds.length})
@@ -331,15 +338,11 @@ const Alunos: React.FC = () => {
 
       {/* Toolbar */}
       <div className="leads-toolbar">
-        <div className="search-box">
-          <Search size={20} />
-          <input
-            type="text"
-            placeholder="Buscar por nome, email, RA, curso..."
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-        </div>
+        <SearchBox
+        placeholder="Buscar por nome, email, RA, curso..."
+        value={searchTerm}
+        onChange={handleSearch}
+      />
         <button
           className={`btn btn-secondary ${showFilters ? "active" : ""}`}
           onClick={() => setShowFilters(!showFilters)}
@@ -451,7 +454,7 @@ const Alunos: React.FC = () => {
               Arraste uma linha pro lado (clique e segure) pra ver, editar,
               assumir ou excluir um aluno.
             </span>
-            {isAdmin && (
+            {canGerenciarPolo && (
               <label style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.4rem" }}>
                 <input
                   type="checkbox"
@@ -469,9 +472,11 @@ const Alunos: React.FC = () => {
           {paginatedAlunos.map((aluno) => {
             const isOwner = aluno.assignedTo === user?.id;
             const semResponsavel = !aluno.assignedTo;
-            const podeEditar = isAdmin || isOwner;
-            const podeAssumir = !isAdmin && semResponsavel;
-            const podeDelegar = isAdmin;
+            const podeEditar = canGerenciarPolo || isOwner;
+            // Colaborador pode assumir contatos sem dono; admin/supervisor delegam diretamente
+            const podeAssumir = !canGerenciarPolo && semResponsavel;
+            // Admin e supervisor podem delegar qualquer contato do polo
+            const podeDelegar = canGerenciarPolo;
 
             return (
               <AlunoSwipeRow
@@ -480,7 +485,7 @@ const Alunos: React.FC = () => {
                 statusLabel={statuses.find((s) => s.value === aluno.status)?.label}
                 sourceLabel={sources.find((s) => s.value === aluno.source)?.label}
                 responsavelNome={colaboradores.find((c) => c.id === aluno.assignedTo)?.name}
-                showSelect={isAdmin}
+                showSelect={canGerenciarPolo}
                 selected={selectedIds.includes(aluno.id)}
                 onToggleSelect={() => toggleSelect(aluno.id)}
                 podeEditar={podeEditar}

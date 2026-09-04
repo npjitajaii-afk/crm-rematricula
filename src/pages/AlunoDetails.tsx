@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAlunos } from "../hooks/useAlunos";
+import { getAlunoById } from "../services/alunosService";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
@@ -50,8 +51,17 @@ const AlunoDetails: React.FC = () => {
   const { itensPorAluno, toggleItem } = useChecklist();
   const { resumoPorAluno, marcarComoLida } = useWhatsapp();
 
+  // Lista do contexto é leve (sem interações). Buscamos a versão completa
+  // para a página de detalhe, que exibe o histórico de contatos.
   useEffect(() => {
-    setAluno(getAluno(id!));
+    if (!id) return;
+    let cancelado = false;
+    const atual = getAluno(id);
+    if (atual) setAluno(atual); // otimista
+    getAlunoById(id).then(({ aluno: completo }) => {
+      if (!cancelado && completo) setAluno(completo);
+    });
+    return () => { cancelado = true; };
   }, [id, getAluno]);
 
   // Ao abrir o card do aluno, marca as mensagens de WhatsApp recebidas

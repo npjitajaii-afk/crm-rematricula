@@ -43,17 +43,19 @@ export const NotificacoesProvider: React.FC<NotificacoesProviderProps> = ({
     };
 
     load();
-    // Garante o aviso recorrente mesmo se o agendador do banco ainda nÃ£o
-    // tiver rodado; a funÃ§Ã£o no banco evita notificaÃ§Ãµes duplicadas.
-    conferirLembreteBoleto();
+
+    // Lembrete de boleto: atrasa 8s pro login não competir com a lista de
+    // alunos (maior ganho de percepção). Depois roda 1x/hora.
+    const lembreteTimeout = window.setTimeout(() => {
+      if (isMounted) conferirLembreteBoleto();
+    }, 8000);
     const lembreteIntervalo = window.setInterval(
       () => conferirLembreteBoleto(),
       60 * 60 * 1000
     );
 
-    // Realtime: recebe notificações novas assim que os triggers do banco
-    // (mudança de status, nova interação) ou um recado do admin as criam,
-    // sem precisar recarregar a página.
+    // Realtime: só INSERT do usuário logado. Mantém no máximo 50 itens
+    // em memória (mesmo limite da query inicial).
     const channel = supabase
       .channel(`notificacoes-realtime-${user.id}`)
       .on(
@@ -65,20 +67,21 @@ export const NotificacoesProvider: React.FC<NotificacoesProviderProps> = ({
           filter: `para_user_id=eq.${user.id}`,
         },
         (payload) => {
-          setNotificacoes((prev) => [
-            mapNotificacaoRow(payload.new),
-            ...prev,
-          ]);
+          setNotificacoes((prev) =>
+            [mapNotificacaoRow(payload.new), ...prev].slice(0, 50)
+          );
         }
       )
       .subscribe();
 
     return () => {
       isMounted = false;
+      window.clearTimeout(lembreteTimeout);
       window.clearInterval(lembreteIntervalo);
       supabase.removeChannel(channel);
     };
-  }, [user]);
+    // Só reage a troca de usuário (id), não a qualquer re-render do objeto user.
+  }, [user?.id]);
 
   const naoLidas = useMemo(
     () => notificacoes.filter((n) => !n.lida).length,

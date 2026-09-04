@@ -102,33 +102,34 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
     }
   };
 
-  // Re-sincroniza o aluno local sempre que o contexto atualizar o registro.
-  // Se o id não estiver na lista já carregada (caso da matrícula vinculada
-  // de outra área que ainda não chegou), busca direto pelo id no banco em
-  // vez de deixar o modal em branco.
+  // Sempre busca a versão completa (com interações) via getAlunoById.
+  // A lista do contexto é leve (sem interações) desde a Fase 1 — se usarmos
+  // só getAluno(), o histórico de contatos fica vazio no modal.
+  // Estratégia: mostra o que já estiver no contexto (otimista) e atualiza
+  // assim que a versão completa chegar do banco.
   useEffect(() => {
     let cancelado = false;
     setNaoEncontrado(false);
 
     const atual = getAluno(alunoId);
     if (atual) {
-      setAluno(atual);
-      return;
+      setAluno(atual); // versão leve imediata (UI não fica em branco)
+    } else {
+      setAluno(undefined);
+      setBuscandoVinculada(true);
     }
 
-    setAluno(undefined);
-    setBuscandoVinculada(true);
     getAlunoById(alunoId)
       .then(({ aluno: encontrado }) => {
         if (cancelado) return;
         if (encontrado) {
-          setAluno(encontrado);
-        } else {
+          setAluno(encontrado); // versão completa com interações
+        } else if (!atual) {
           setNaoEncontrado(true);
         }
       })
       .catch(() => {
-        if (!cancelado) setNaoEncontrado(true);
+        if (!cancelado && !atual) setNaoEncontrado(true);
       })
       .finally(() => {
         if (!cancelado) setBuscandoVinculada(false);
@@ -149,8 +150,14 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   }, [onClose]);
 
   const refreshAluno = () => {
-    const atual = getAluno(alunoId);
-    if (atual) setAluno(atual);
+    // Preferimos a versão completa (com interações) após mutações no modal.
+    getAlunoById(alunoId).then(({ aluno: encontrado }) => {
+      if (encontrado) setAluno(encontrado);
+      else {
+        const atual = getAluno(alunoId);
+        if (atual) setAluno(atual);
+      }
+    });
   };
 
   if (!aluno) {

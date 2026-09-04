@@ -59,3 +59,14 @@
     height: 6px;
   }
 }
+
+/* Durante o arraste de um card: cursor padrão e sem pan visual. */
+.kanban-board-wrapper--card-dragging {
+  cursor: default;
+  user-select: none;
+}
+
+.kanban-board-wrapper--card-dragging .kanban-column {
+  /* Garante que o hit-test do dnd enxergue a coluna inteira. */
+  pointer-events: auto;
+}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback, ReactNode } from "react";
+import React, { useState, useEffect, useMemo, useCallback, ReactNode, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { Aluno, AlunoFilters, Interacao, PipelineStatusResumo, Area, AlunoStatus, CanalContato, Polo } from "../types";
 import {
   getAlunos,
@@ -44,6 +45,13 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   const [polos, setPolos] = useState<Polo[]>([]);
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const isSupervisor = user?.role === "supervisor";
+  /** Admin ou supervisor — gestão do polo inteiro (delegar, excluir, ver equipe). */
+  const canGerenciarPolo = isAdmin || isSupervisor;
+
+  const areasCarregadasRef = useRef<Set<string>>(new Set());
+  const location = useLocation();
+
 
   // Detecta a área do funil que o usuário está abrindo (pela URL atual) pra
   // priorizar essa busca primeiro. Lida direto com window.location (em vez
@@ -83,8 +91,37 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         // login). Agora: busca em lotes, priorizando a área que o usuário
         // está abrindo — a tela já libera assim que o primeiro lote chega,
         // enquanto o restante continua carregando por trás.
+        // Meta (pipeline, colaboradores, polos) em paralelo com a 1ª página
+        // de alunos — não espera a lista inteira terminar.
+        const metaPromise = Promise.all([
+          getPipelineResumo(),
+          getColaboradoresService(),
+          getPolosService(),
+        ]).then(([pipelineRes, colabRes, polosRes]) => {
+          if (cancelado) return;
+          if (pipelineRes.error) {
+            console.error("Erro ao carregar resumo do pipeline:", pipelineRes.error);
+          } else {
+            setStatusResumo(pipelineRes.resumo);
+          }
+          if (colabRes.error) {
+            console.error("Erro ao carregar colaboradores:", colabRes.error);
+          } else {
+            setColaboradores(colabRes.colaboradores);
+          }
+          if (polosRes.error) {
+            console.error("Erro ao carregar polos:", polosRes.error);
+          } else {
+            setPolos(polosRes.polos);
+          }
+        });
+
+        // Lista leve (sem interações). Só a área da rota no login —
+        // outras áreas sob demanda ao navegar (ver ensureAreaLoaded).
         const { error } = await getAlunos({
-          areaPrioritaria: areaAtiva,
+          // Sem rota de funil (ex: minha-área): começa por rematrícula, resto sob demanda.
+          areaPrioritaria: areaAtiva ?? "rematricula",
+          somenteAreaPrioritaria: true,
           onPage: (parcial) => {
             if (cancelado) return;
             setAlunos(parcial);
@@ -97,41 +134,29 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
 
         if (error) {
           console.error("Erro ao carregar alunos:", error);
+        } else {
+          areasCarregadasRef.current.add(areaAtiva ?? "rematricula");
         }
 
-        const { resumo, error: resumoError } = await getPipelineResumo();
-        if (!cancelado) {
-          if (resumoError) {
-            console.error("Erro ao carregar resumo do pipeline:", resumoError);
-          } else {
-            setStatusResumo(resumo);
-          }
-        }
+        await metaPromise;
 
-        // Todos os usuários precisam da lista de colaboradores para exibir
-        // o nome do responsável em cada contato. A restrição de ATRIBUIÇÃO
-        // continua na UI (podeDelegar) e no banco — aqui é só leitura.
-        {
-          const { colaboradores: fetchedColaboradores, error: colaboradoresError } =
-            await getColaboradoresService();
-          if (!cancelado) {
-            if (colaboradoresError) {
-              console.error("Erro ao carregar colaboradores:", colaboradoresError);
-            } else {
-              setColaboradores(fetchedColaboradores);
-            }
-          }
-        }
-
-        {
-          const { polos: fetchedPolos, error: polosError } = await getPolosService();
-          if (!cancelado) {
-            if (polosError) {
-              console.error("Erro ao carregar polos:", polosError);
-            } else {
-              setPolos(fetchedPolos);
-            }
-          }
+        // Rede de segurança: se a 1ª tentativa veio vazia (JWT/RLS ainda
+        // não prontos no login), tenta uma vez mais sem cancelar a UI.
+        if (!cancelado && !primeiroLoteChegou) {
+          const { error: err2 } = await getAlunos({
+            areaPrioritaria: areaAtiva ?? "rematricula",
+            somenteAreaPrioritaria: true,
+            onPage: (parcial) => {
+              if (cancelado) return;
+              setAlunos(parcial);
+              if (!primeiroLoteChegou) {
+                primeiroLoteChegou = true;
+                setIsLoadingAlunos(false);
+              }
+            },
+          });
+          if (err2) console.error("Erro no retry de alunos:", err2);
+          else areasCarregadasRef.current.add(areaAtiva ?? "rematricula");
         }
       } finally {
         // Rede de segurança: se não veio nenhum lote (ex: usuário sem
@@ -146,7 +171,57 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     return () => {
       cancelado = true;
     };
-  }, [user, isAdmin]);
+  }, [user?.id, isAdmin]);
+
+  /**
+   * Garante que os alunos de uma área estão no estado. No login só vem a
+   * área da rota; ao navegar para outra, busca só essa área (lista leve).
+   */
+  const ensureAreaLoaded = useCallback(
+    async (area: Aluno["area"]) => {
+      if (!user) return;
+      if (areasCarregadasRef.current.has(area)) return;
+
+      // Marca só depois do sucesso — se marcar antes e a request falhar/cancelar,
+      // a área fica "carregada" vazia até um F5.
+      const { alunos: daArea, error } = await getAlunos({
+        areaPrioritaria: area,
+        somenteAreaPrioritaria: true,
+      });
+      if (error) {
+        console.error("Erro ao carregar área", area, error);
+        return;
+      }
+      areasCarregadasRef.current.add(area);
+      setAlunos((prev) => {
+        const ids = new Set(prev.map((a) => a.id));
+        const novos = daArea.filter((a) => !ids.has(a.id));
+        return novos.length ? [...prev, ...novos] : prev;
+      });
+    },
+    [user?.id]
+  );
+
+  // Quando a rota muda, carrega a área correspondente se ainda não estiver no cache.
+  useEffect(() => {
+    if (!user) {
+      areasCarregadasRef.current = new Set();
+      return;
+    }
+    const path = location.pathname;
+    let area: Aluno["area"] | undefined;
+    if (path.startsWith("/retencao")) area = "retencao";
+    else if (path.startsWith("/engajamento")) area = "engajamento";
+    else if (
+      path.startsWith("/alunos") ||
+      path.startsWith("/meus-contatos") ||
+      path.startsWith("/risco-evasao") ||
+      path.startsWith("/rematricula")
+    ) {
+      area = "rematricula";
+    }
+    if (area) void ensureAreaLoaded(area);
+  }, [user?.id, location.pathname, ensureAreaLoaded]);
 
   const addAluno = useCallback(
     async (
@@ -165,12 +240,12 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
           "createdBy" in newAluno && newAluno.createdBy
             ? newAluno.createdBy
             : user.id,
-        poloId:
-          "poloId" in newAluno && newAluno.poloId
-            ? newAluno.poloId
-            : !isAdmin && user.poloId
-            ? user.poloId
-            : undefined,
+        // Admin também é isolado por polo agora (migration 020) — o INSERT
+        // só passa se polo_id bater com o polo de quem está logado, então
+        // um poloId explícito diferente do próprio (ex: picker de polo no
+        // AlunoForm pra admin) seria rejeitado pela RLS. Por isso ignoramos
+        // qualquer poloId vindo de fora e sempre usamos o do usuário logado.
+        poloId: user.poloId,
       };
 
       const { aluno, error } = await createAluno(alunoData);
@@ -189,10 +264,31 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
 
   const updateAluno = useCallback(
     async (id: string, updatedData: Partial<Aluno>) => {
+      // Otimista: move o card na hora (drag-and-drop e edições pontuais).
+      // Se o servidor falhar, revertemos pro estado anterior.
+      let snapshot: Aluno | undefined;
+      setAlunos((prev) =>
+        prev.map((a) => {
+          if (a.id !== id) return a;
+          snapshot = a;
+          return {
+            ...a,
+            ...updatedData,
+            // statusAtualizadoEm acompanha mudança de status no UI
+            ...(updatedData.status
+              ? { statusAtualizadoEm: new Date() }
+              : {}),
+          };
+        })
+      );
+
       const { aluno, error } = await updateAlunoService(id, updatedData);
 
       if (error) {
         console.error("Erro ao atualizar aluno:", error);
+        if (snapshot) {
+          setAlunos((prev) => prev.map((a) => (a.id === id ? snapshot! : a)));
+        }
         throw new Error(error);
       }
 
@@ -573,6 +669,10 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       source: (campos.canal || "outro") as Aluno["source"],
       value: parseFloat(campos.valor || "0") || undefined,
       observations: observations || undefined,
+      // Sem isso, o INSERT cai no polo padrão (Itajaí) via DEFAULT da
+      // coluna — não no polo de quem está importando. Todo aluno criado
+      // (inclusive por admin) fica no polo de quem o criou.
+      poloId: user?.poloId,
       tags,
       createdBy: userId,
     };
@@ -914,6 +1014,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       importAlunosEngajamento,
       exportAlunos,
       isAdmin,
+      isSupervisor,
+      canGerenciarPolo,
       statusResumo,
       colaboradores,
       polos,
@@ -937,6 +1039,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       importAlunosEngajamento,
       exportAlunos,
       isAdmin,
+      isSupervisor,
+      canGerenciarPolo,
       statusResumo,
       colaboradores,
       polos,

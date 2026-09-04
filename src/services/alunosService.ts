@@ -11,6 +11,13 @@ export interface AlunosResponse {
   error: string | null;
 }
 
+/** Lista/kanban: sem histórico de interações (payload leve). */
+const SELECT_LISTA = `
+  *,
+  polos ( nome )
+`;
+
+/** Detalhe/modal: inclui interações + autor. */
 const SELECT_WITH_INTERACOES = `
   *,
   polos ( nome ),
@@ -99,23 +106,24 @@ statusAtualizadoEm: data.status_atualizado_em
 }
 
 /**
- * Tamanho de cada lote buscado do Supabase. Antes disso a query trazia
- * TODOS os alunos + interações numa única chamada sem `.range()`, o que
- * cresce sem teto conforme a base aumenta (ver README.md, Bloco B).
+ * Tamanho de cada lote. 100 é um meio-termo: 1º lote libera a UI rápido
+ * e ainda reduz round-trips vs páginas de 50. Interações não vêm na lista.
  */
-const PAGE_SIZE = 500;
+const PAGE_SIZE = 100;
 
 export interface GetAlunosOptions {
   /**
    * Área que deve ser buscada primeiro (ex: a aba/funil que o usuário está
-   * abrindo agora). Chega mais rápido pra tela, o resto é buscado em
-   * seguida sem bloquear a primeira renderização.
+   * abrindo agora). Chega mais rápido pra tela.
    */
   areaPrioritaria?: Aluno['area'];
   /**
-   * Chamado a cada lote buscado (tanto da área prioritária quanto do
-   * restante), com a lista acumulada até aquele ponto. Permite ao chamador
-   * já exibir dados parciais em vez de esperar tudo terminar.
+   * Se true (padrão quando há areaPrioritaria), NÃO busca as outras áreas
+   * no login — carrega sob demanda via loadAreaAlunos / getAlunos depois.
+   */
+  somenteAreaPrioritaria?: boolean;
+  /**
+   * Chamado a cada lote buscado, com a lista acumulada até aquele ponto.
    */
   onPage?: (alunosParciais: Aluno[], pagina: number) => void;
 }
@@ -127,7 +135,7 @@ export interface GetAlunosOptions {
  * após o login e crescia sem controle conforme a base aumentava.
  */
 export async function getAlunos(options: GetAlunosOptions = {}): Promise<AlunosResponse> {
-  const { areaPrioritaria, onPage } = options;
+  const { areaPrioritaria, somenteAreaPrioritaria = !!options.areaPrioritaria, onPage } = options;
   const todos: Aluno[] = [];
 
   // Busca um lote por vez (com o filtro passado em `aplicarFiltro`) até a
@@ -145,7 +153,7 @@ export async function getAlunos(options: GetAlunosOptions = {}): Promise<AlunosR
       const query = aplicarFiltro(
         supabase
           .from('alunos')
-          .select(SELECT_WITH_INTERACOES)
+          .select(SELECT_LISTA)
           .order('created_at', { ascending: false })
       ).range(from, to);
 
@@ -169,13 +177,15 @@ export async function getAlunos(options: GetAlunosOptions = {}): Promise<AlunosR
 
   try {
     if (areaPrioritaria) {
-      // 1) área ativa primeiro, em lotes pequenos — libera a tela rápido.
+      // 1) área ativa primeiro — libera a tela rápido.
       const erroArea = await buscarEmLotes((q) => q.eq('area', areaPrioritaria));
       if (erroArea) return { alunos: todos, error: erroArea };
 
-      // 2) o restante (outras áreas) em seguida, sem travar quem já está vendo a tela.
-      const erroResto = await buscarEmLotes((q) => q.neq('area', areaPrioritaria));
-      if (erroResto) return { alunos: todos, error: erroResto };
+      // 2) outras áreas só quando somenteAreaPrioritaria === false.
+      if (!somenteAreaPrioritaria) {
+        const erroResto = await buscarEmLotes((q) => q.neq('area', areaPrioritaria));
+        if (erroResto) return { alunos: todos, error: erroResto };
+      }
     } else {
       const erro = await buscarEmLotes((q) => q);
       if (erro) return { alunos: todos, error: erro };
@@ -590,28 +600,48 @@ export async function deleteAluno(id: string): Promise<{ error: string | null }>
 }
 
 /**
- * Deleta múltiplos alunos de uma vez (uso: admin apagando em massa).
- * RLS garante que colaborador só consegue apagar o que é dele mesmo
- * passando vários ids aqui.
+ * Deleta múltiplos alunos em lotes.
+ * Um único .in() com centenas de UUIDs estoura URL/payload do PostgREST
+ * (2–3 ids passam; "selecionar todos" falha). Por isso partimos em chunks.
  */
 export async function deleteAlunosBulk(
   ids: string[]
 ): Promise<{ error: string | null; deletedCount: number }> {
-  try {
-    const { data, error } = await supabase
-      .from('alunos')
-      .delete()
-      .in('id', ids)
-      .select('id'); // força avaliação row-a-row e retorna o que foi deletado
+  if (ids.length === 0) return { error: null, deletedCount: 0 };
 
-    if (error) {
-      console.error('Error bulk deleting alunos:', error);
-      return { error: error.message, deletedCount: 0 };
+  const CHUNK = 50;
+  let deletedCount = 0;
+  const errors: string[] = [];
+
+  try {
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const { data, error } = await supabase
+        .from('alunos')
+        .delete()
+        .in('id', chunk)
+        .select('id');
+
+      if (error) {
+        console.error('Error bulk deleting alunos (chunk):', error);
+        errors.push(error.message);
+        continue;
+      }
+      deletedCount += data?.length ?? 0;
     }
 
-    return { error: null, deletedCount: data?.length ?? 0 };
+    if (deletedCount === 0 && errors.length > 0) {
+      return { error: errors[0], deletedCount: 0 };
+    }
+    if (errors.length > 0) {
+      return {
+        error: `Alguns lotes falharam: ${errors.join('; ')}`,
+        deletedCount,
+      };
+    }
+    return { error: null, deletedCount };
   } catch {
-    return { error: 'Erro ao excluir alunos selecionados', deletedCount: 0 };
+    return { error: 'Erro ao excluir alunos selecionados', deletedCount };
   }
 }
 
@@ -668,9 +698,10 @@ export async function delegarAluno(id: string, colaboradorId: string): Promise<A
  */
 export async function getPipelineResumo(): Promise<{ resumo: PipelineStatusResumo[]; error: string | null }> {
   try {
-    const { data, error } = await supabase
-      .from('pipeline_rematricula_resumo')
-      .select('*');
+    // A view antiga (pipeline_rematricula_resumo) não tinha isolamento por
+    // polo nenhum (ver migration 020) — trocada pela RPC equivalente, que
+    // já filtra pelo polo de quem está logado.
+    const { data, error } = await supabase.rpc('pipeline_rematricula_polo');
 
     if (error) {
       console.error('Error fetching pipeline resumo:', error);
@@ -697,10 +728,12 @@ export async function getColaboradores(): Promise<{
   error: string | null;
 }> {
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, name, email, polo_id, polos(nome)')
-      .order('name');
+    // profiles agora é isolado por polo pra quem não é admin (migration
+    // 020), e mesmo pra admin essa lista específica ("minha equipe") deve
+    // vir só do próprio polo — por isso usa a RPC em vez de ler a tabela
+    // direto. (A tela de Usuários, admin-only, continua lendo a tabela
+    // profiles direto e enxergando todo mundo, de propósito.)
+    const { data, error } = await supabase.rpc('colaboradores_polo');
 
     if (error) {
       console.error('Error fetching colaboradores:', error);
@@ -708,17 +741,13 @@ export async function getColaboradores(): Promise<{
     }
 
     return {
-      colaboradores: (data || []).map((row) => {
-        const poloJoin = row.polos as { nome: string } | { nome: string }[] | null;
-        const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;
-        return {
-          id: row.id,
-          name: row.name,
-          email: row.email,
-          poloId: row.polo_id ?? undefined,
-          poloNome,
-        };
-      }),
+      colaboradores: (data || []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        poloId: row.polo_id ?? undefined,
+        poloNome: row.polo_nome ?? undefined,
+      })),
       error: null,
     };
   } catch {
