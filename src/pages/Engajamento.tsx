@@ -4,10 +4,11 @@ import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
-import { Search, Plus, Sparkles, MoveHorizontal, Upload, Trash2 } from "lucide-react";
+import { Search, Plus, Sparkles, MoveHorizontal, Upload, Trash2, Filter } from "lucide-react";
 import SearchBox from "../components/SearchBox";
 import { AREA_CONFIG } from "../config/areas";
 import { getStatusLabel, getSourceLabel } from "../utils/formatters";
+import { AlunoStatus } from "../types";
 import AlunoSwipeRow from "../components/AlunoSwipeRow";
 import EngajamentoTabs from "../components/EngajamentoTabs";
 import AlunoExpandModal from "../components/AlunoExpandModal";
@@ -80,6 +81,10 @@ const Engajamento: React.FC = () => {
   const { confirm } = useConfirm();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState(filters.search || "");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<string[]>(
+    filters.status || []
+  );
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   // Ao clicar no card/linha do aluno, expande o painel por cima da tela
   // (ver AlunoExpandModal.tsx) em vez de navegar pra /alunos/:id.
@@ -98,6 +103,26 @@ const Engajamento: React.FC = () => {
     searchDebounceRef.current = setTimeout(() => {
       setFilters({ ...filters, search: value });
     }, 300);
+  };
+
+  const handleStatusFilter = (status: string) => {
+    const newStatus = selectedStatus.includes(status)
+      ? selectedStatus.filter((s) => s !== status)
+      : [...selectedStatus, status];
+
+    setSelectedStatus(newStatus);
+    setCurrentPage(1);
+    setFilters({
+      ...filters,
+      status: newStatus.length > 0 ? (newStatus as AlunoStatus[]) : undefined,
+    });
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setSelectedStatus([]);
+    setCurrentPage(1);
+    setFilters({});
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -234,11 +259,46 @@ const Engajamento: React.FC = () => {
 
       <div className="leads-toolbar">
         <SearchBox
-        placeholder="Buscar por nome, email, RA, curso..."
-        value={searchTerm}
-        onChange={handleSearch}
-      />
+          placeholder="Buscar por nome, email, RA, curso..."
+          value={searchTerm}
+          onChange={handleSearch}
+        />
+        <button
+          className={`btn btn-secondary ${showFilters ? "active" : ""}`}
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <Filter size={18} />
+          Filtros
+          {selectedStatus.length > 0 && (
+            <span className="filter-badge">{selectedStatus.length}</span>
+          )}
+        </button>
       </div>
+
+      {showFilters && (
+        <div className="filters-panel">
+          <div className="filter-group">
+            <label>Status:</label>
+            <div className="filter-options">
+              {statuses.map((status) => (
+                <label key={status.value} className="filter-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={selectedStatus.includes(status.value)}
+                    onChange={() => handleStatusFilter(status.value)}
+                  />
+                  <span>{status.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="filter-actions">
+            <button className="btn btn-secondary" onClick={handleClearFilters}>
+              Limpar Filtros
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Lista de Alunos: sem Kanban, cada linha é arrastada pro lado
           (clicando e segurando o botão do mouse, ou com o dedo no touch)
