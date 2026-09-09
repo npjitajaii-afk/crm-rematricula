@@ -39,7 +39,7 @@ import "./AlunoDetails.css";
 const AlunoDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getAluno, addInteraction, updateAluno, deleteAluno, assumirAluno, delegarAluno, isAdmin, colaboradores } = useAlunos();
+  const { getAluno, addInteraction, updateAluno, deleteAluno, assumirAluno, delegarAluno, isAdmin, canGerenciarPolo, colaboradores } = useAlunos();
   const { user } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -159,11 +159,10 @@ const AlunoDetails: React.FC = () => {
 
   const isOwner = aluno.assignedTo === user?.id;
   const semResponsavel = !aluno.assignedTo;
-  // Admin sempre pode editar (corrigir infos erradas mesmo sem ser o responsável).
-  // Colaborador autenticado também pode tentar editar; o RLS no banco garante
-  // que só o responsável (ou admin/supervisor do polo) consiga salvar de fato.
-  // Exclusão continua restrita ao admin ou ao responsável pelo contato.
-  const podeEditar = !!user;
+  // Admin/supervisor editam qualquer contato do polo.
+  // Colaborador só edita os próprios — mas pode VER contatos de outros
+  // (busca no polo) para não cadastrar duplicado.
+  const podeEditar = canGerenciarPolo || isOwner;
   const podeExcluir = isAdmin || isOwner;
 
   const handleAssumir = async () => {

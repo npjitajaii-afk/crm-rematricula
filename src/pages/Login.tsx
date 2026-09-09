@@ -38,7 +38,8 @@ const Login: React.FC = () => {
 
     try {
       await login(email, password);
-      navigate("/dashboard");
+      // Deixa o IndexRedirect decidir: admin → /dashboard, demais → /minha-area
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao fazer login");
     } finally {

@@ -13,7 +13,7 @@ const AlunoForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getAluno, addAluno, updateAluno, isLoadingAlunos, isAdmin, canGerenciarPolo, polos } = useAlunos();
+  const { getAluno, addAluno, updateAluno, isLoadingAlunos, isAdmin, canGerenciarPolo, polos, alunos, colaboradores } = useAlunos();
   const { user } = useAuth();
   const { showToast } = useToast();
   const isEditing = !!id;
@@ -78,6 +78,33 @@ const AlunoForm: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Ao cadastrar: avisa se já existe contato parecido no polo (qualquer
+  // responsável). Colaborador vê, mas não edita — evita cadastro duplicado.
+  const contatosParecidos = React.useMemo(() => {
+    if (isEditing) return [];
+    const nome = formData.name.trim().toLowerCase();
+    const phone = formData.phone.replace(/\D/g, "");
+    const email = formData.email.trim().toLowerCase();
+    const ra = formData.ra.trim().toLowerCase();
+    if (!nome && phone.length < 8 && !email && !ra) return [];
+
+    return alunos
+      .filter((a) => {
+        if (ra && a.ra && a.ra.toLowerCase() === ra) return true;
+        if (email && a.email && a.email.toLowerCase() === email) return true;
+        const aPhone = (a.phone || "").replace(/\D/g, "");
+        if (phone.length >= 8 && aPhone.length >= 8) {
+          if (aPhone.endsWith(phone.slice(-8)) || phone.endsWith(aPhone.slice(-8))) {
+            return true;
+          }
+        }
+        if (nome.length >= 3 && a.name.toLowerCase().includes(nome)) return true;
+        return false;
+      })
+      .slice(0, 5);
+  }, [isEditing, formData.name, formData.phone, formData.email, formData.ra, alunos]);
+
 
   // Enquanto a lista de alunos ainda está carregando do banco, "não
   // encontrado" ainda não é um veredito confiável — só decidimos isso
@@ -271,6 +298,35 @@ const AlunoForm: React.FC = () => {
 
       <div className="lead-form-container">
         <form onSubmit={handleSubmit} className="lead-form">
+        {contatosParecidos.length > 0 && (
+          <div className="form-duplicado-aviso" role="status">
+            <strong>
+              {contatosParecidos.length === 1
+                ? "Já existe um contato parecido no polo"
+                : `Já existem ${contatosParecidos.length} contatos parecidos no polo`}
+            </strong>
+            <ul>
+              {contatosParecidos.map((a) => {
+                const resp =
+                  colaboradores.find((c) => c.id === a.assignedTo)?.name ||
+                  (a.assignedTo ? "outro colaborador" : "sem responsável");
+                return (
+                  <li key={a.id}>
+                    <span>{a.name}</span>
+                    {a.ra ? <span> · RA {a.ra}</span> : null}
+                    {a.phone ? <span> · {a.phone}</span> : null}
+                    <span> · {resp}</span>
+                    <span> · {a.area}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <p>
+              Não cadastre de novo. Se precisar tratar este aluno, peça
+              delegação ao responsável ou fale com o admin/supervisor.
+            </p>
+          </div>
+        )}
           {/* Informações Básicas */}
           <div className="form-section">
             <h2>Informações Básicas</h2>

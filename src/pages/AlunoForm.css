@@ -196,3 +196,29 @@
   border-color: var(--primary);
   color: white;
 }
+
+/* Aviso de contato já existente no polo (cadastro) */
+.form-duplicado-aviso {
+  background: #fff8e6;
+  border: 1px solid #f0d78c;
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  color: var(--text-primary);
+}
+.form-duplicado-aviso strong {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.form-duplicado-aviso ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+.form-duplicado-aviso li {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+.form-duplicado-aviso p {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
