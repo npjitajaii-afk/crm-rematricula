@@ -159,9 +159,10 @@ const AlunoDetails: React.FC = () => {
 
   const isOwner = aluno.assignedTo === user?.id;
   const semResponsavel = !aluno.assignedTo;
-  // Qualquer colaborador autenticado pode editar o aluno (inclui as tags).
-  // A exclusão continua restrita ao admin ou ao responsável pelo contato,
-  // por ser uma ação destrutiva — separada de propósito da permissão de edição.
+  // Admin sempre pode editar (corrigir infos erradas mesmo sem ser o responsável).
+  // Colaborador autenticado também pode tentar editar; o RLS no banco garante
+  // que só o responsável (ou admin/supervisor do polo) consiga salvar de fato.
+  // Exclusão continua restrita ao admin ou ao responsável pelo contato.
   const podeEditar = !!user;
   const podeExcluir = isAdmin || isOwner;
 

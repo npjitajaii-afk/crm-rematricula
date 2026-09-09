@@ -13,16 +13,7 @@ const AlunoForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    getAluno,
-    addAluno,
-    updateAluno,
-    isLoadingAlunos,
-    isAdmin,
-    canGerenciarPolo,
-    polos,
-    colaboradores,
-  } = useAlunos();
+  const { getAluno, addAluno, updateAluno, isLoadingAlunos, isAdmin, canGerenciarPolo, polos } = useAlunos();
   const { user } = useAuth();
   const { showToast } = useToast();
   const isEditing = !!id;
@@ -74,12 +65,9 @@ const AlunoForm: React.FC = () => {
       observations: existingAluno?.observations || "",
       tags: existingAluno?.tags || ([] as string[]),
       poloId: existingAluno?.poloId || polos[0]?.id || "",
-      // Admin/supervisor podem escolher o responsável já na criação.
-      // Se veio de "Meus Contatos" (?paraMim=1), pré-seleciona o usuário atual.
-      assignedTo: existingAluno?.assignedTo || (paraMim && user?.id ? user.id : ""),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [existingAluno, polos, paraMim, user?.id]
+    [existingAluno, polos]
   );
 
   const [formData, setFormData] = useState(buildFormData);
@@ -103,11 +91,21 @@ const AlunoForm: React.FC = () => {
       return;
     }
 
+    // Admin/supervisor podem editar qualquer contato do polo (ex.: corrigir
+    // cadastro com informações erradas), mesmo sem ser o responsável.
+    // Colaborador só edita contatos atribuídos a ele.
+    const isOwner = existingAluno.assignedTo === user?.id;
+    if (!canGerenciarPolo && !isOwner) {
+      showToast("Você não tem permissão para editar este contato.", "error");
+      navigate(`/alunos/${id}`);
+      return;
+    }
+
     if (!hasHydrated) {
       setFormData(buildFormData());
       setHasHydrated(true);
     }
-  }, [isEditing, isLoadingAlunos, existingAluno, hasHydrated, buildFormData, navigate, showToast]);
+  }, [isEditing, isLoadingAlunos, existingAluno, hasHydrated, buildFormData, navigate, showToast, canGerenciarPolo, user?.id, id]);
 
   const statuses: { value: AlunoStatus; label: string }[] = areaConfig.statuses.map(
     (status) => ({ value: status, label: areaConfig.getLabel(status) })
@@ -221,29 +219,16 @@ const AlunoForm: React.FC = () => {
         showToast("Aluno atualizado com sucesso!", "success");
         navigate(`/alunos/${id}`);
       } else {
-        // Responsável: admin/supervisor escolhem no formulário; colaborador
-        // só atribui a si quando veio de "Meus Contatos" (?paraMim=1).
-        const assignedTo =
-          canGerenciarPolo && formData.assignedTo
-            ? formData.assignedTo
-            : paraMim
-            ? user.id
-            : undefined;
-
         await addAluno({
           ...alunoData,
           area: effectiveArea,
           statusAtualizadoEm: new Date(),
           createdBy: user.id,
-          assignedTo,
+          assignedTo: paraMim ? user.id : undefined,
           ...(isAdmin && formData.poloId ? { poloId: formData.poloId } : {}),
         });
         showToast(
-          assignedTo
-            ? assignedTo === user.id
-              ? "Contato criado e atribuído a você!"
-              : "Contato criado e delegado com sucesso!"
-            : "Aluno criado com sucesso!",
+          paraMim ? "Contato criado e atribuído a você!" : "Aluno criado com sucesso!",
           "success"
         );
         navigate(
@@ -438,46 +423,6 @@ const AlunoForm: React.FC = () => {
                   min="0"
                 />
               </div>
-
-              {/* Admin e supervisor podem delegar o contato já na criação
-                  (engajamento e rematrícula). Colaborador não vê este campo. */}
-              {!isEditing &&
-                canGerenciarPolo &&
-                (effectiveArea === "engajamento" ||
-                  effectiveArea === "rematricula") && (
-                <div className="form-group">
-                  <label htmlFor="assignedTo">Responsável</label>
-                  <select
-                    id="assignedTo"
-                    name="assignedTo"
-                    value={formData.assignedTo}
-                    onChange={handleChange}
-                  >
-                    <option value="">Sem responsável (fila geral)</option>
-                    {(user &&
-                    !colaboradores.some((c) => c.id === user.id)
-                      ? [
-                          ...colaboradores,
-                          {
-                            id: user.id,
-                            name: user.name,
-                            email: user.email,
-                          },
-                        ]
-                      : colaboradores
-                    ).map((colaborador) => (
-                      <option key={colaborador.id} value={colaborador.id}>
-                        {colaborador.name}
-                        {colaborador.id === user?.id ? " (você)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <small>
-                    Escolha quem ficará responsável por este contato. Deixe em
-                    branco para entrar na fila sem responsável.
-                  </small>
-                </div>
-              )}
             </div>
           </div>
 

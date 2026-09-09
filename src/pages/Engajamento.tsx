@@ -51,8 +51,8 @@ const Engajamento: React.FC = () => {
     deleteAluno,
     deleteAlunosBulk,
     assumirAluno,
-    exportAlunos,
     isAdmin,
+    canGerenciarPolo,
     colaboradores,
   } = useAlunos();
 
@@ -86,6 +86,7 @@ const Engajamento: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string[]>(
     filters.status || []
   );
+  // Filtro por responsável (assignedTo). "" = Todos.
   const [selectedColaborador, setSelectedColaborador] = useState<string>(
     filters.assignedTo || ""
   );
@@ -113,7 +114,6 @@ const Engajamento: React.FC = () => {
     const newStatus = selectedStatus.includes(status)
       ? selectedStatus.filter((s) => s !== status)
       : [...selectedStatus, status];
-
     setSelectedStatus(newStatus);
     setCurrentPage(1);
     setFilters({
@@ -122,12 +122,12 @@ const Engajamento: React.FC = () => {
     });
   };
 
-  const handleColaboradorFilter = (value: string) => {
-    setSelectedColaborador(value);
+  const handleColaboradorFilter = (colaboradorId: string) => {
+    setSelectedColaborador(colaboradorId);
     setCurrentPage(1);
     setFilters({
       ...filters,
-      assignedTo: value || undefined,
+      assignedTo: colaboradorId || undefined,
     });
   };
 
@@ -137,6 +137,45 @@ const Engajamento: React.FC = () => {
     setSelectedColaborador("");
     setCurrentPage(1);
     setFilters({});
+  };
+
+  // Exporta só os contatos de Engajamento (já filtrados por status/colaborador/busca).
+  const handleExport = async () => {
+    try {
+      const dataToExport = filteredAlunos.map((aluno) => ({
+        Nome: aluno.name,
+        Email: aluno.email,
+        Telefone: aluno.phone,
+        RA: aluno.ra || "",
+        Curso: aluno.curso || "",
+        Turno: aluno.turno || "",
+        Status: statuses.find((s) => s.value === aluno.status)?.label || aluno.status,
+        Canal: sources.find((s) => s.value === aluno.source)?.label || aluno.source,
+        Responsável:
+          colaboradores.find((c) => c.id === aluno.assignedTo)?.name || "",
+        "Valor Pendente": aluno.value || 0,
+        "Data Criação": new Date(aluno.createdAt).toLocaleDateString("pt-BR"),
+        Observações: aluno.observations || "",
+        Tags: (aluno.tags || []).join(", "),
+      }));
+
+      const XLSX = await import("xlsx");
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Engajamento");
+
+      const fileName = `alunos-engajamento-${
+        new Date().toISOString().split("T")[0]
+      }.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      showToast(
+        `${dataToExport.length} contato(s) exportado(s) com sucesso.`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Erro ao exportar:", error);
+      showToast("Erro ao exportar planilha. Tente novamente.", "error");
+    }
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -240,27 +279,13 @@ const Engajamento: React.FC = () => {
           </p>
         </div>
         <div className="leads-actions">
-          {isAdmin && selectedIds.length > 0 && (
+          {canGerenciarPolo && selectedIds.length > 0 && (
             <button className="btn btn-danger" onClick={handleBulkDelete}>
               <Trash2 size={18} />
               Excluir selecionados ({selectedIds.length})
             </button>
           )}
-          <button
-            className="btn btn-secondary"
-            onClick={() =>
-              exportAlunos({
-                area: "engajamento",
-                fileNamePrefix: "funil-engajamento",
-              })
-            }
-            disabled={filteredAlunos.length === 0}
-            title={
-              filteredAlunos.length === 0
-                ? "Nenhum aluno para exportar"
-                : "Exportar funil de engajamento em planilha"
-            }
-          >
+          <button className="btn btn-secondary" onClick={handleExport}>
             <Download size={18} />
             Exportar
           </button>
@@ -326,25 +351,23 @@ const Engajamento: React.FC = () => {
               ))}
             </div>
           </div>
+
           <div className="filter-group">
-            <label htmlFor="filtro-colaborador-engajamento">Colaborador:</label>
+            <label>Colaborador:</label>
             <select
-              id="filtro-colaborador-engajamento"
               className="filter-select"
               value={selectedColaborador}
               onChange={(e) => handleColaboradorFilter(e.target.value)}
             >
               <option value="">Todos</option>
-              <option value="__sem__">Sem responsável</option>
-              {[...colaboradores]
-                .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.poloNome ? c.name + " (" + c.poloNome + ")" : c.name}
-                  </option>
-                ))}
+              {colaboradores.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
             </select>
           </div>
+
           <div className="filter-actions">
             <button className="btn btn-secondary" onClick={handleClearFilters}>
               Limpar Filtros
@@ -378,7 +401,7 @@ const Engajamento: React.FC = () => {
               Arraste uma linha pro lado (clique e segure) pra ver, editar,
               assumir ou excluir um aluno.
             </span>
-            {isAdmin && (
+            {canGerenciarPolo && (
               <label style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.4rem" }}>
                 <input
                   type="checkbox"
@@ -393,9 +416,11 @@ const Engajamento: React.FC = () => {
           {paginatedAlunos.map((aluno) => {
             const isOwner = aluno.assignedTo === user?.id;
             const semResponsavel = !aluno.assignedTo;
-            const podeEditar = isAdmin || isOwner;
-            const podeAssumir = !isAdmin && semResponsavel;
-            const podeDelegar = isAdmin;
+            // Admin/supervisor editam qualquer contato do polo (corrige infos erradas
+            // mesmo sem ser o responsável). Colaborador só edita os próprios.
+            const podeEditar = canGerenciarPolo || isOwner;
+            const podeAssumir = !canGerenciarPolo && semResponsavel;
+            const podeDelegar = canGerenciarPolo;
 
             return (
               <AlunoSwipeRow
@@ -404,7 +429,7 @@ const Engajamento: React.FC = () => {
                 statusLabel={statuses.find((s) => s.value === aluno.status)?.label}
                 sourceLabel={sources.find((s) => s.value === aluno.source)?.label}
                 responsavelNome={colaboradores.find((c) => c.id === aluno.assignedTo)?.name}
-                showSelect={isAdmin}
+                showSelect={canGerenciarPolo}
                 selected={selectedIds.includes(aluno.id)}
                 onToggleSelect={() => toggleSelect(aluno.id)}
                 podeEditar={podeEditar}
