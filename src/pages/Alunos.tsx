@@ -83,6 +83,9 @@ const Alunos: React.FC = () => {
   const [selectedSource, setSelectedSource] = useState<string[]>(
     filters.source || []
   );
+  const [selectedColaborador, setSelectedColaborador] = useState<string>(
+    filters.assignedTo || ""
+  );
   const [dateFrom, setDateFrom] = useState<string>(
     filters.dateFrom
       ? new Date(filters.dateFrom).toISOString().split("T")[0]
@@ -173,10 +176,20 @@ const Alunos: React.FC = () => {
     });
   };
 
+  const handleColaboradorFilter = (value: string) => {
+    setSelectedColaborador(value);
+    setCurrentPage(1);
+    setFilters({
+      ...filters,
+      assignedTo: value || undefined,
+    });
+  };
+
   const handleClearFilters = () => {
     setSearchTerm("");
     setSelectedStatus([]);
     setSelectedSource([]);
+    setSelectedColaborador("");
     setDateFrom("");
     setDateTo("");
     setFilters({});
@@ -351,11 +364,13 @@ const Alunos: React.FC = () => {
           Filtros
           {(selectedStatus.length > 0 ||
             selectedSource.length > 0 ||
+            selectedColaborador ||
             dateFrom ||
             dateTo) && (
             <span className="filter-badge">
               {selectedStatus.length +
                 selectedSource.length +
+                (selectedColaborador ? 1 : 0) +
                 (dateFrom ? 1 : 0) +
                 (dateTo ? 1 : 0)}
             </span>
@@ -420,6 +435,26 @@ const Alunos: React.FC = () => {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="filter-group">
+            <label htmlFor="filtro-colaborador-rematricula">Colaborador:</label>
+            <select
+              id="filtro-colaborador-rematricula"
+              className="filter-select"
+              value={selectedColaborador}
+              onChange={(e) => handleColaboradorFilter(e.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="__sem__">Sem responsável</option>
+              {[...colaboradores]
+                .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.poloNome ? c.name + " (" + c.poloNome + ")" : c.name}
+                  </option>
+                ))}
+            </select>
           </div>
 
           <div className="filter-actions">

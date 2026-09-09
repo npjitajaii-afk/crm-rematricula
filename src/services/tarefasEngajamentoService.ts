@@ -67,3 +67,19 @@ export async function getTarefaPorId(id: string, area: TarefasArea = "engajament
   const { data, error } = await supabase.from(tables(area).tarefas).select(select(area)).eq("id", id).single();
   return { tarefa: data ? mapTarefa(data) : null, error: error?.message ?? null };
 }
+
+/** Tarefas pessoais vinculadas a um aluno específico (aba do card). */
+export async function getTarefasPorAluno(
+  alunoId: string,
+  area: TarefasArea = "engajamento"
+) {
+  const { data, error } = await supabase
+    .from(tables(area).tarefas)
+    .select(select(area))
+    .eq("aluno_id", alunoId)
+    .order("updated_at", { ascending: false });
+  return {
+    tarefas: (data || []).map(mapTarefa),
+    error: error?.message ?? null,
+  };
+}

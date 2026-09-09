@@ -2,8 +2,18 @@ import React, { useState, useEffect } from "react";
 import { X, Plus, Trash2, Check, Circle } from "lucide-react";
 import { TarefaPessoal, TarefaPessoalStatus } from "../types";
 import { useTarefasEngajamento } from "../hooks/useTarefasEngajamento";
+import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
+import {
+  adicionarTarefaChecklistItem,
+  atualizarTarefaPessoal,
+  criarTarefaPessoal,
+  excluirTarefaPessoal,
+  removerTarefaChecklistItem,
+  TarefasArea,
+  toggleTarefaChecklistItem,
+} from "../services/tarefasEngajamentoService";
 import "./TarefaModal.css";
 
 interface AlunoOption {
@@ -16,6 +26,12 @@ interface TarefaModalProps {
   tarefa?: TarefaPessoal;
   alunos: AlunoOption[];
   isAdmin?: boolean;
+  /** Quando aberto a partir do card do aluno, trava o vínculo neste id. */
+  alunoIdFixo?: string;
+  /** Força a área das tabelas ao abrir pelo card do aluno. */
+  areaFixa?: TarefasArea;
+  /** Chamado após criar/atualizar/excluir com sucesso. */
+  onSaved?: () => void;
 }
 
 const TarefaModal: React.FC<TarefaModalProps> = ({
@@ -23,24 +39,106 @@ const TarefaModal: React.FC<TarefaModalProps> = ({
   tarefa,
   alunos,
   isAdmin,
+  alunoIdFixo,
+  areaFixa,
+  onSaved,
 }) => {
-  const {
-    criarTarefa,
-    atualizarTarefa,
-    excluirTarefa,
-    toggleChecklistItem,
-    adicionarChecklistItem,
-    removerChecklistItem,
-  } = useTarefasEngajamento();
+  const ctx = useTarefasEngajamento();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+
+  const criarTarefa = async (dados: {
+    titulo: string;
+    anotacoes?: string;
+    alunoId?: string;
+    prazo?: Date;
+    checklist?: { texto: string }[];
+  }) => {
+    if (areaFixa) {
+      if (!user) throw new Error("Usuário não autenticado");
+      const { error } = await criarTarefaPessoal(user.id, dados, areaFixa);
+      if (error) throw new Error(error);
+      return;
+    }
+    return ctx.criarTarefa(dados);
+  };
+
+  const atualizarTarefa = async (
+    id: string,
+    dados: Partial<{
+      titulo: string;
+      anotacoes: string;
+      alunoId: string | null;
+      prazo: Date | null;
+      status: TarefaPessoalStatus;
+    }>
+  ) => {
+    if (areaFixa) {
+      const { error } = await atualizarTarefaPessoal(id, dados, areaFixa);
+      if (error) throw new Error(error);
+      return;
+    }
+    return ctx.atualizarTarefa(id, dados);
+  };
+
+  const excluirTarefa = async (id: string) => {
+    if (areaFixa) {
+      const { error } = await excluirTarefaPessoal(id, areaFixa);
+      if (error) throw new Error(error);
+      return;
+    }
+    return ctx.excluirTarefa(id);
+  };
+
+  const toggleChecklistItem = async (itemId: string, concluido: boolean) => {
+    if (areaFixa) {
+      const { error } = await toggleTarefaChecklistItem(
+        itemId,
+        concluido,
+        areaFixa
+      );
+      if (error) throw new Error(error);
+      onSaved?.();
+      return;
+    }
+    return ctx.toggleChecklistItem(itemId, concluido);
+  };
+
+  const adicionarChecklistItem = async (tarefaId: string, texto: string) => {
+    if (areaFixa) {
+      const ordem = tarefa?.checklist.length || 0;
+      const { error } = await adicionarTarefaChecklistItem(
+        tarefaId,
+        texto,
+        ordem,
+        areaFixa
+      );
+      if (error) throw new Error(error);
+      onSaved?.();
+      return;
+    }
+    return ctx.adicionarChecklistItem(tarefaId, texto);
+  };
+
+  const removerChecklistItem = async (itemId: string) => {
+    if (areaFixa) {
+      const { error } = await removerTarefaChecklistItem(itemId, areaFixa);
+      if (error) throw new Error(error);
+      onSaved?.();
+      return;
+    }
+    return ctx.removerChecklistItem(itemId);
+  };
 
   const isEdicao = !!tarefa;
   const podeEditar = !isEdicao || !isAdmin || tarefa.userId === undefined || true;
 
   const [titulo, setTitulo] = useState(tarefa?.titulo ?? "");
   const [anotacoes, setAnotacoes] = useState(tarefa?.anotacoes ?? "");
-  const [alunoId, setAlunoId] = useState(tarefa?.alunoId ?? "");
+  const [alunoId, setAlunoId] = useState(
+    tarefa?.alunoId ?? alunoIdFixo ?? ""
+  );
   const [prazo, setPrazo] = useState(
     tarefa?.prazo ? tarefa.prazo.toISOString().slice(0, 10) : ""
   );
@@ -110,6 +208,7 @@ const TarefaModal: React.FC<TarefaModalProps> = ({
         });
         showToast("Tarefa criada!", "success");
       }
+      onSaved?.();
       onClose();
     } catch (err) {
       showToast(
@@ -133,6 +232,7 @@ const TarefaModal: React.FC<TarefaModalProps> = ({
     try {
       await excluirTarefa(tarefa.id);
       showToast("Tarefa excluída.", "success");
+      onSaved?.();
       onClose();
     } catch (err) {
       showToast(
@@ -193,11 +293,16 @@ const TarefaModal: React.FC<TarefaModalProps> = ({
           </div>
 
           <div className="form-group">
-            <label htmlFor="tarefa-aluno">Aluno vinculado (opcional)</label>
+            <label htmlFor="tarefa-aluno">
+              {alunoIdFixo
+                ? "Aluno vinculado"
+                : "Aluno vinculado (opcional)"}
+            </label>
             <select
               id="tarefa-aluno"
               value={alunoId}
               onChange={(e) => setAlunoId(e.target.value)}
+              disabled={!!alunoIdFixo}
             >
               <option value="">Nenhum aluno</option>
               {alunos.map((a) => (

@@ -27,6 +27,28 @@ import {
   findHeaderRowIndex,
   FieldSpec,
 } from "../utils/planilhaImport";
+import { getStatusLabel } from "../utils/formatters";
+
+/** Observações podem ser JSON de anotações ou texto legado. */
+function flattenObservacoes(raw: string | undefined): string {
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((a: { texto?: string; autorNome?: string }) =>
+          a.texto
+            ? `${a.autorNome ? a.autorNome + ": " : ""}${a.texto}`
+            : ""
+        )
+        .filter(Boolean)
+        .join(" | ");
+    }
+  } catch {
+    /* texto simples */
+  }
+  return raw;
+}
 
 interface AlunosProviderProps {
   children: ReactNode;
@@ -495,7 +517,12 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       }
 
       if (filters.assignedTo) {
-        if (aluno.assignedTo !== filters.assignedTo) return false;
+        // "__sem__" = contatos sem responsável atribuído
+        if (filters.assignedTo === "__sem__") {
+          if (aluno.assignedTo) return false;
+        } else if (aluno.assignedTo !== filters.assignedTo) {
+          return false;
+        }
       }
 
       if (filters.poloId) {
@@ -960,31 +987,64 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   }, [user, polos]);
 
   // Otimização 5.1: também usa import dinâmico do xlsx na exportação.
-  const exportAlunos = useCallback(async (): Promise<void> => {
-    const dataToExport = filteredAlunos.map((aluno) => ({
-      Nome: aluno.name,
-      Email: aluno.email,
-      Telefone: aluno.phone,
-      RA: aluno.ra || "",
-      Curso: aluno.curso || "",
-      Turno: aluno.turno || "",
-      Status: aluno.status,
-      Canal: aluno.source,
-      "Valor Pendente": aluno.value || 0,
-      "Data Criação": new Date(aluno.createdAt).toLocaleDateString("pt-BR"),
-      Observações: aluno.observations || "",
-    }));
+  const exportAlunos = useCallback(
+    async (options?: {
+      area?: Area;
+      fileNamePrefix?: string;
+    }): Promise<void> => {
+      const lista = options?.area
+        ? filteredAlunos.filter((aluno) => aluno.area === options.area)
+        : filteredAlunos;
 
-    const XLSX = await import("xlsx");
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Alunos");
+      const dataToExport = lista.map((aluno) => {
+        const responsavel = colaboradores.find(
+          (c) => c.id === aluno.assignedTo
+        );
+        return {
+          Nome: aluno.name,
+          Email: aluno.email,
+          Telefone: aluno.phone,
+          RA: aluno.ra || "",
+          Curso: aluno.curso || "",
+          Turno: aluno.turno || "",
+          Área: aluno.area,
+          Status: getStatusLabel(aluno.status),
+          Canal: aluno.source,
+          Responsável: responsavel?.name || "",
+          Polo: aluno.poloNome || "",
+          Tags: (aluno.tags || []).join(", "),
+          "Valor Pendente": aluno.value || 0,
+          "Data Criação": new Date(aluno.createdAt).toLocaleDateString(
+            "pt-BR"
+          ),
+          "Status desde": new Date(
+            aluno.statusAtualizadoEm
+          ).toLocaleDateString("pt-BR"),
+          Observações: flattenObservacoes(aluno.observations),
+        };
+      });
 
-    const fileName = `alunos-rematricula-${
-      new Date().toISOString().split("T")[0]
-    }.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-  }, [filteredAlunos]);
+      const XLSX = await import("xlsx");
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      const sheetName =
+        options?.area === "engajamento"
+          ? "Engajamento"
+          : options?.area === "retencao"
+          ? "Retencao"
+          : "Alunos";
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+      const prefix =
+        options?.fileNamePrefix ||
+        (options?.area ? `alunos-${options.area}` : "alunos-rematricula");
+      const fileName = `${prefix}-${
+        new Date().toISOString().split("T")[0]
+      }.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    },
+    [filteredAlunos, colaboradores]
+  );
 
   // Otimização (Bloco B): o value do Provider era um objeto literal novo a
   // cada render — como qualquer componente que usa useAlunos() assina o

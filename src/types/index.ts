@@ -461,7 +461,10 @@ export interface AlunosContextType {
     file: File,
     onProgress?: (done: number, total: number) => void
   ) => Promise<{ imported: number; ignored: number; duplicados: number }>;
-  exportAlunos: () => void;
+  exportAlunos: (options?: {
+    area?: Area;
+    fileNamePrefix?: string;
+  }) => void | Promise<void>;
   isAdmin: boolean;
   isSupervisor: boolean;
   /** true para quem pode gerenciar o polo inteiro: admin ou supervisor */

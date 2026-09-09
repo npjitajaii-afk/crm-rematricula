@@ -9,7 +9,16 @@ import { TarefasEngajamentoContext } from "./tarefas-engajamento-context";
 export const TarefasEngajamentoProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { pathname } = useLocation();
-  const area: TarefasArea = pathname.startsWith("/rematricula/") ? "rematricula" : "engajamento";
+  // /alunos, /meus-contatos e /risco-evasao são rotas da Rematrícula
+  // (sem o prefixo /rematricula/). Sem isso, o modal do card em /alunos
+  // gravaria na tabela de engajamento por engano.
+  const area: TarefasArea =
+    pathname.startsWith("/rematricula") ||
+    pathname.startsWith("/alunos") ||
+    pathname.startsWith("/meus-contatos") ||
+    pathname.startsWith("/risco-evasao")
+      ? "rematricula"
+      : "engajamento";
   const [tarefas, setTarefas] = useState<TarefaPessoal[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const load = useCallback(async () => {

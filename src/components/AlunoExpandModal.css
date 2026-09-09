@@ -487,3 +487,201 @@
   white-space: pre-wrap;
   margin: 0;
 }
+/* ---- Tarefas / Agendamentos no card ---- */
+.aluno-expand-tarefas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.aluno-expand-tarefas-lista,
+.aluno-expand-agenda-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aluno-expand-tarefa-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface, #fff);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.aluno-expand-tarefa-item:hover {
+  border-color: var(--primary, #00a9aa);
+  background: rgba(0, 169, 170, 0.04);
+}
+
+.aluno-expand-tarefa-item--concluida {
+  opacity: 0.7;
+}
+
+.aluno-expand-tarefa-item--concluida strong {
+  text-decoration: line-through;
+}
+
+.aluno-expand-tarefa-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-top: 0.1rem;
+  border-radius: 999px;
+  color: var(--primary, #00a9aa);
+  background: rgba(0, 169, 170, 0.1);
+}
+
+.aluno-expand-tarefa-corpo {
+  flex: 1;
+  min-width: 0;
+}
+
+.aluno-expand-tarefa-corpo strong {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.aluno-expand-tarefa-corpo p {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.aluno-expand-tarefa-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.aluno-expand-tarefa-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.aluno-expand-checklist-bloco {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.aluno-expand-checklist-bloco h4 {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.aluno-expand-agenda-item {
+  padding: 0.75rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface, #fff);
+}
+
+.aluno-expand-agenda-data {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--primary, #00a9aa);
+  margin-bottom: 0.35rem;
+}
+
+.aluno-expand-agenda-ticket {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.aluno-expand-agenda-item p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.aluno-expand-agenda-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: rgba(0, 169, 170, 0.03);
+}
+
+.aluno-expand-agenda-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.aluno-expand-agenda-form input,
+.aluno-expand-agenda-form textarea {
+  font-weight: 400;
+  font-size: 0.875rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-primary);
+  background: var(--surface, #fff);
+}
+
+.aluno-expand-agenda-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.aluno-expand-agenda-form-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.aluno-expand-agenda-item-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.aluno-expand-agenda-item:hover .aluno-expand-agenda-excluir {
+  opacity: 1;
+}
+
+@media (max-width: 520px) {
+  .aluno-expand-agenda-form-row {
+    grid-template-columns: 1fr;
+  }
+}

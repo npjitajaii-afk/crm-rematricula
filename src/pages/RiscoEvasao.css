@@ -27,7 +27,7 @@
   font-size: 0.875rem;
 }
 
-/* ── Cards de resumo ────────────────────────────────────────────── */
+/* ── Cards de resumo / filtro por faixa ─────────────────────────── */
 
 .risco-resumo {
   display: grid;
@@ -35,47 +35,64 @@
   gap: 1rem;
 }
 
-.resumo-card {
+/* Classes próprias (evita conflito com .resumo-card do Dashboard) */
+.risco-faixa-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
   padding: 1.25rem 1rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-md, 8px);
   border: 2px solid transparent;
   cursor: pointer;
   font-family: inherit;
-  transition: var(--transition);
+  background: #f8fafc;
+  color: inherit;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
-.resumo-numero {
+.risco-faixa-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.risco-faixa-card.ativo {
+  box-shadow: 0 0 0 1px currentColor inset;
+}
+
+.risco-faixa-card .resumo-numero {
   font-size: 2rem;
   font-weight: 700;
   line-height: 1;
 }
 
-.resumo-label {
+.risco-faixa-card .resumo-label {
   font-size: 0.8125rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.resumo-critico               { background: #fef2f2; color: #dc2626; }
-.resumo-critico:hover,
-.resumo-critico.ativo         { border-color: #dc2626; background: #fee2e2; }
+.risco-faixa-critico { background: #fef2f2; color: #dc2626; }
+.risco-faixa-critico:hover,
+.risco-faixa-critico.ativo { border-color: #dc2626; background: #fee2e2; }
 
-.resumo-alto                  { background: #fff7ed; color: #ea580c; }
-.resumo-alto:hover,
-.resumo-alto.ativo            { border-color: #ea580c; background: #ffedd5; }
+.risco-faixa-alto { background: #fff7ed; color: #ea580c; }
+.risco-faixa-alto:hover,
+.risco-faixa-alto.ativo { border-color: #ea580c; background: #ffedd5; }
 
-.resumo-medio                 { background: #fefce8; color: #ca8a04; }
-.resumo-medio:hover,
-.resumo-medio.ativo           { border-color: #ca8a04; background: #fef9c3; }
+.risco-faixa-medio { background: #fefce8; color: #ca8a04; }
+.risco-faixa-medio:hover,
+.risco-faixa-medio.ativo { border-color: #ca8a04; background: #fef9c3; }
 
-.resumo-baixo                 { background: #f0fdf4; color: #16a34a; }
-.resumo-baixo:hover,
-.resumo-baixo.ativo           { border-color: #16a34a; background: #dcfce7; }
+.risco-faixa-baixo { background: #f0fdf4; color: #16a34a; }
+.risco-faixa-baixo:hover,
+.risco-faixa-baixo.ativo { border-color: #16a34a; background: #dcfce7; }
+
+.risco-filtro-contagem {
+  color: var(--text-secondary, #64748b);
+  font-size: 0.8125rem;
+}
 
 /* ── Filtro ativo ───────────────────────────────────────────────── */
 

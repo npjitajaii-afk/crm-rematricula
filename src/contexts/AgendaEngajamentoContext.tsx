@@ -8,7 +8,15 @@ import { AgendaEngajamentoContext } from "./agenda-engajamento-context";
 export const AgendaEngajamentoProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { pathname } = useLocation();
-  const area: AgendaArea = pathname.startsWith("/rematricula/") ? "rematricula" : "engajamento";
+  // Mesma regra de TarefasEngajamentoContext: rotas principais da
+  // Rematrícula não usam o prefixo /rematricula/.
+  const area: AgendaArea =
+    pathname.startsWith("/rematricula") ||
+    pathname.startsWith("/alunos") ||
+    pathname.startsWith("/meus-contatos") ||
+    pathname.startsWith("/risco-evasao")
+      ? "rematricula"
+      : "engajamento";
   const [compromissos, setCompromissos] = useState<AgendaCompromisso[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 

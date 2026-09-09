@@ -4,7 +4,7 @@ import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
-import { Search, Plus, Sparkles, MoveHorizontal, Upload, Trash2, Filter } from "lucide-react";
+import { Search, Plus, Sparkles, MoveHorizontal, Upload, Trash2, Filter, Download } from "lucide-react";
 import SearchBox from "../components/SearchBox";
 import { AREA_CONFIG } from "../config/areas";
 import { getStatusLabel, getSourceLabel } from "../utils/formatters";
@@ -51,6 +51,7 @@ const Engajamento: React.FC = () => {
     deleteAluno,
     deleteAlunosBulk,
     assumirAluno,
+    exportAlunos,
     isAdmin,
     colaboradores,
   } = useAlunos();
@@ -85,6 +86,9 @@ const Engajamento: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string[]>(
     filters.status || []
   );
+  const [selectedColaborador, setSelectedColaborador] = useState<string>(
+    filters.assignedTo || ""
+  );
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   // Ao clicar no card/linha do aluno, expande o painel por cima da tela
   // (ver AlunoExpandModal.tsx) em vez de navegar pra /alunos/:id.
@@ -118,9 +122,19 @@ const Engajamento: React.FC = () => {
     });
   };
 
+  const handleColaboradorFilter = (value: string) => {
+    setSelectedColaborador(value);
+    setCurrentPage(1);
+    setFilters({
+      ...filters,
+      assignedTo: value || undefined,
+    });
+  };
+
   const handleClearFilters = () => {
     setSearchTerm("");
     setSelectedStatus([]);
+    setSelectedColaborador("");
     setCurrentPage(1);
     setFilters({});
   };
@@ -232,6 +246,24 @@ const Engajamento: React.FC = () => {
               Excluir selecionados ({selectedIds.length})
             </button>
           )}
+          <button
+            className="btn btn-secondary"
+            onClick={() =>
+              exportAlunos({
+                area: "engajamento",
+                fileNamePrefix: "funil-engajamento",
+              })
+            }
+            disabled={filteredAlunos.length === 0}
+            title={
+              filteredAlunos.length === 0
+                ? "Nenhum aluno para exportar"
+                : "Exportar funil de engajamento em planilha"
+            }
+          >
+            <Download size={18} />
+            Exportar
+          </button>
           <label className={`btn btn-secondary${importProgress ? " btn-disabled" : ""}`}>
             <Upload size={18} />
             {importProgress
@@ -269,8 +301,10 @@ const Engajamento: React.FC = () => {
         >
           <Filter size={18} />
           Filtros
-          {selectedStatus.length > 0 && (
-            <span className="filter-badge">{selectedStatus.length}</span>
+          {(selectedStatus.length > 0 || selectedColaborador) && (
+            <span className="filter-badge">
+              {selectedStatus.length + (selectedColaborador ? 1 : 0)}
+            </span>
           )}
         </button>
       </div>
@@ -291,6 +325,25 @@ const Engajamento: React.FC = () => {
                 </label>
               ))}
             </div>
+          </div>
+          <div className="filter-group">
+            <label htmlFor="filtro-colaborador-engajamento">Colaborador:</label>
+            <select
+              id="filtro-colaborador-engajamento"
+              className="filter-select"
+              value={selectedColaborador}
+              onChange={(e) => handleColaboradorFilter(e.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="__sem__">Sem responsável</option>
+              {[...colaboradores]
+                .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.poloNome ? c.name + " (" + c.poloNome + ")" : c.name}
+                  </option>
+                ))}
+            </select>
           </div>
           <div className="filter-actions">
             <button className="btn btn-secondary" onClick={handleClearFilters}>

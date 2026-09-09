@@ -17,3 +17,19 @@ export async function excluirCompromissoAgenda(id: string, area: AgendaArea = "e
   const { error } = await supabase.from(table(area)).delete().eq("id", id);
   return { error: error?.message ?? null };
 }
+
+/** Compromissos da agenda vinculados a um aluno específico (aba do card). */
+export async function getCompromissosPorAluno(
+  alunoId: string,
+  area: AgendaArea = "engajamento"
+) {
+  const { data, error } = await supabase
+    .from(table(area))
+    .select(SELECT)
+    .eq("aluno_id", alunoId)
+    .order("data", { ascending: true });
+  return {
+    compromissos: (data || []).map(mapRow),
+    error: error?.message ?? null,
+  };
+}
