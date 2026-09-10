@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -15,17 +15,22 @@ import {
   MessageSquare,
   Plus,
   Link2,
+  Calendar,
+  Clock3,
 } from "lucide-react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useChecklist } from "../hooks/useChecklist";
 import { useToast } from "../hooks/useToast";
-import { AlunoStatus } from "../types";
+import { AlunoStatus, TarefaPessoal, AgendaCompromisso } from "../types";
 import { getAlunoById } from "../services/alunosService";
+import { getTarefasPorAluno, TarefasArea } from "../services/tarefasEngajamentoService";
+import { getCompromissosPorAluno, criarCompromissoAgenda, AgendaArea } from "../services/agendaEngajamentoService";
 import { AREA_CONFIG } from "../config/areas";
 import { TAGS_SELECIONAVEIS_POR_AREA, TAGS_DISPONIVEIS } from "../utils/tags";
 import { getStatusColor, getStatusLabel } from "../utils/formatters";
 import NovaMatriculaModal from "./NovaMatriculaModal";
+import TarefaModal from "./TarefaModal";
 import "../pages/AlunoDetails.css";
 import "../pages/AlunoForm.css";
 import "./AlunoExpandModal.css";
@@ -82,11 +87,24 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   const [naoEncontrado, setNaoEncontrado] = useState(false);
   const [novaAnotacao, setNovaAnotacao] = useState("");
   const [salvandoObs, setSalvandoObs] = useState(false);
-  // Anotações e Tarefas dividem a coluna do meio em abas — só uma fica
-  // visível por vez (ver pedido do usuário).
-  const [abaMeio, setAbaMeio] = useState<"anotacoes" | "tarefas">(
+  // Anotações | Tarefas | Agenda — só uma fica visível por vez.
+  // Tarefas e Agenda respeitam vínculo ao aluno + isolamento por funil/polo.
+  const [abaMeio, setAbaMeio] = useState<"anotacoes" | "tarefas" | "agenda">(
     "anotacoes"
   );
+
+  // Tarefas pessoais vinculadas a este aluno (aparecem só se o colaborador vinculou)
+  const [tarefasVinculadas, setTarefasVinculadas] = useState<TarefaPessoal[]>([]);
+  const [carregandoTarefas, setCarregandoTarefas] = useState(false);
+  const [modalTarefaAberto, setModalTarefaAberto] = useState(false);
+
+  // Agenda vinculada a este aluno
+  const [compromissosVinculados, setCompromissosVinculados] = useState<AgendaCompromisso[]>([]);
+  const [carregandoAgenda, setCarregandoAgenda] = useState(false);
+  const [criandoAgenda, setCriandoAgenda] = useState(false);
+  const [novaAgendaData, setNovaAgendaData] = useState("");
+  const [novaAgendaComentario, setNovaAgendaComentario] = useState("");
+  const [salvandoAgenda, setSalvandoAgenda] = useState(false);
 
   // Interpreta o campo observations como lista de entradas JSON.
   // Formato: [{id, texto, autorNome, autorId, criadaEm}]
@@ -160,12 +178,60 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
     });
   };
 
+  // Área do funil do aluno (isolamento por funil).
+  // "retencao" usa as tabelas de rematrícula por enquanto se necessário.
+  const areaTarefas: TarefasArea =
+    aluno?.area === "engajamento" ? "engajamento" : "rematricula";
+  const areaAgenda: AgendaArea =
+    aluno?.area === "engajamento" ? "engajamento" : "rematricula";
+
+  const carregarTarefasVinculadas = useCallback(async () => {
+    if (!aluno?.id) return;
+    setCarregandoTarefas(true);
+    try {
+      const { tarefas, error } = await getTarefasPorAluno(aluno.id, areaTarefas);
+      if (error) {
+        console.error("Erro ao carregar tarefas do aluno:", error);
+      } else {
+        setTarefasVinculadas(tarefas);
+      }
+    } finally {
+      setCarregandoTarefas(false);
+    }
+  }, [aluno?.id, areaTarefas]);
+
+  const carregarAgendaVinculada = useCallback(async () => {
+    if (!aluno?.id) return;
+    setCarregandoAgenda(true);
+    try {
+      const { compromissos, error } = await getCompromissosPorAluno(
+        aluno.id,
+        areaAgenda
+      );
+      if (error) {
+        console.error("Erro ao carregar agenda do aluno:", error);
+      } else {
+        setCompromissosVinculados(compromissos);
+      }
+    } finally {
+      setCarregandoAgenda(false);
+    }
+  }, [aluno?.id, areaAgenda]);
+
   // Checklist: effect sempre na mesma ordem de hooks (antes do early return).
   useEffect(() => {
     if (aluno?.area === "engajamento" && aluno?.id) {
       garantirItensCarregados(aluno.id);
     }
   }, [aluno?.area, aluno?.id, garantirItensCarregados]);
+
+  // Carrega tarefas e agenda vinculadas quando o aluno está disponível.
+  useEffect(() => {
+    if (aluno?.id) {
+      carregarTarefasVinculadas();
+      carregarAgendaVinculada();
+    }
+  }, [aluno?.id, carregarTarefasVinculadas, carregarAgendaVinculada]);
 
   if (!aluno) {
     // Ainda buscando a matrícula vinculada (ou ela não existe mais) — sem
@@ -446,9 +512,31 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
               >
                 <ListChecks size={14} />
                 Tarefas
-                {itensChecklist && itensChecklist.length > 0 && (
+                {aluno.area === "engajamento" &&
+                  itensChecklist &&
+                  itensChecklist.length > 0 && (
+                    <span className="aluno-expand-tab-badge">
+                      {concluidos}/{itensChecklist.length}
+                    </span>
+                  )}
+                {tarefasVinculadas.length > 0 && (
                   <span className="aluno-expand-tab-badge">
-                    {concluidos}/{itensChecklist.length}
+                    {tarefasVinculadas.filter((t) => t.status === "em_andamento").length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`aluno-expand-tab${
+                  abaMeio === "agenda" ? " active" : ""
+                }`}
+                onClick={() => setAbaMeio("agenda")}
+              >
+                <Calendar size={14} />
+                Agenda
+                {compromissosVinculados.length > 0 && (
+                  <span className="aluno-expand-tab-badge">
+                    {compromissosVinculados.length}
                   </span>
                 )}
               </button>
@@ -516,63 +604,260 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : abaMeio === "tarefas" ? (
                 <div className="card aluno-expand-tarefas">
-                  {aluno.area !== "engajamento" ? (
+                  {/* Checklist fixo de 7 itens — somente no funil de Engajamento */}
+                  {aluno.area === "engajamento" && (
+                    <>
+                      {checklistCarregando && !itensChecklist ? (
+                        <p className="checklist-vazio">Carregando checklist…</p>
+                      ) : !itensChecklist || itensChecklist.length === 0 ? (
+                        <p className="checklist-vazio">
+                          Nenhuma tarefa de checklist cadastrada para este aluno.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="checklist-progresso">
+                            <div className="checklist-progresso-barra">
+                              <div
+                                className="checklist-progresso-preenchida"
+                                style={{
+                                  width: `${Math.round(
+                                    (concluidos / itensChecklist.length) * 100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                            <span>
+                              {concluidos}/{itensChecklist.length} concluído
+                            </span>
+                          </div>
+                          <ul className="checklist-detalhe-itens">
+                            {itensChecklist.map((item) => (
+                              <li key={item.id}>
+                                <button
+                                  type="button"
+                                  className={`checklist-detalhe-item${
+                                    item.concluido
+                                      ? " checklist-detalhe-item--concluido"
+                                      : ""
+                                  }`}
+                                  onClick={() =>
+                                    toggleItem(item, !item.concluido)
+                                  }
+                                >
+                                  <span className="checklist-detalhe-checkbox">
+                                    {item.concluido && (
+                                      <Check size={12} strokeWidth={3} />
+                                    )}
+                                  </span>
+                                  <div>
+                                    <span className="checklist-detalhe-label">
+                                      {item.label}
+                                    </span>
+                                  </div>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                      <hr style={{ margin: "1rem 0", border: "none", borderTop: "1px solid #e5e7eb" }} />
+                    </>
+                  )}
+
+                  {/* Tarefas pessoais vinculadas a este aluno (ambos os funis) */}
+                  <div style={{ marginBottom: "0.75rem" }}>
+                    <strong style={{ fontSize: "0.85rem", color: "#374151" }}>
+                      Tarefas vinculadas
+                    </strong>
+                  </div>
+                  {carregandoTarefas ? (
+                    <p className="checklist-vazio">Carregando tarefas…</p>
+                  ) : tarefasVinculadas.length === 0 ? (
                     <p className="checklist-vazio">
-                      Checklist de tarefas disponível apenas para alunos da
-                      área de Engajamento.
-                    </p>
-                  ) : checklistCarregando && !itensChecklist ? (
-                    <p className="checklist-vazio">Carregando checklist…</p>
-                  ) : !itensChecklist || itensChecklist.length === 0 ? (
-                    <p className="checklist-vazio">
-                      Nenhuma tarefa cadastrada para este aluno.
+                      Nenhuma tarefa vinculada a este aluno.
                     </p>
                   ) : (
-                    <>
-                      <div className="checklist-progresso">
-                        <div className="checklist-progresso-barra">
+                    <ul className="checklist-detalhe-itens">
+                      {tarefasVinculadas.map((tarefa) => (
+                        <li key={tarefa.id}>
                           <div
-                            className="checklist-progresso-preenchida"
-                            style={{
-                              width: `${Math.round(
-                                (concluidos / itensChecklist.length) * 100
-                              )}%`,
-                            }}
-                          />
-                        </div>
-                        <span>
-                          {concluidos}/{itensChecklist.length} concluído
-                        </span>
-                      </div>
-                      <ul className="checklist-detalhe-itens">
-                        {itensChecklist.map((item) => (
-                          <li key={item.id}>
-                            <button
-                              type="button"
-                              className={`checklist-detalhe-item${
-                                item.concluido
-                                  ? " checklist-detalhe-item--concluido"
-                                  : ""
-                              }`}
-                              onClick={() => toggleItem(item, !item.concluido)}
-                            >
-                              <span className="checklist-detalhe-checkbox">
-                                {item.concluido && (
-                                  <Check size={12} strokeWidth={3} />
-                                )}
+                            className={`checklist-detalhe-item${
+                              tarefa.status === "concluido"
+                                ? " checklist-detalhe-item--concluido"
+                                : ""
+                            }`}
+                            style={{ cursor: "default" }}
+                          >
+                            <span className="checklist-detalhe-checkbox">
+                              {tarefa.status === "concluido" && (
+                                <Check size={12} strokeWidth={3} />
+                              )}
+                            </span>
+                            <div>
+                              <span className="checklist-detalhe-label">
+                                {tarefa.titulo}
                               </span>
-                              <div>
-                                <span className="checklist-detalhe-label">
-                                  {item.label}
+                              {tarefa.prazo && (
+                                <span
+                                  style={{
+                                    display: "block",
+                                    fontSize: "0.75rem",
+                                    color: "#6b7280",
+                                  }}
+                                >
+                                  <Clock3
+                                    size={11}
+                                    style={{
+                                      display: "inline",
+                                      marginRight: 4,
+                                    }}
+                                  />
+                                  {tarefa.prazo.toLocaleDateString("pt-BR")}
                                 </span>
-                              </div>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
+                              )}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {podeEditarCard && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ marginTop: "0.75rem" }}
+                      onClick={() => setModalTarefaAberto(true)}
+                    >
+                      <Plus size={14} />
+                      Criar tarefa
+                    </button>
+                  )}
+                </div>
+              ) : (
+                /* ===== Aba Agenda ===== */
+                <div className="card aluno-expand-tarefas">
+                  {carregandoAgenda ? (
+                    <p className="checklist-vazio">Carregando agenda…</p>
+                  ) : compromissosVinculados.length === 0 && !criandoAgenda ? (
+                    <p className="checklist-vazio">
+                      Nenhum compromisso vinculado a este aluno.
+                    </p>
+                  ) : (
+                    <ul className="checklist-detalhe-itens">
+                      {compromissosVinculados.map((c) => (
+                        <li key={c.id}>
+                          <div
+                            className="checklist-detalhe-item"
+                            style={{ cursor: "default" }}
+                          >
+                            <span className="checklist-detalhe-checkbox">
+                              <Calendar size={12} />
+                            </span>
+                            <div>
+                              <span className="checklist-detalhe-label">
+                                {c.comentario}
+                              </span>
+                              <span
+                                style={{
+                                  display: "block",
+                                  fontSize: "0.75rem",
+                                  color: "#6b7280",
+                                }}
+                              >
+                                {c.data.toLocaleDateString("pt-BR")}
+                                {c.ticket ? ` · Ticket: ${c.ticket}` : ""}
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {criandoAgenda ? (
+                    <div style={{ marginTop: "0.75rem" }}>
+                      <input
+                        type="date"
+                        className="aluno-expand-textarea"
+                        style={{ marginBottom: 8, height: 36 }}
+                        value={novaAgendaData}
+                        onChange={(e) => setNovaAgendaData(e.target.value)}
+                      />
+                      <textarea
+                        className="aluno-expand-textarea"
+                        placeholder="Comentário / descrição do compromisso..."
+                        value={novaAgendaComentario}
+                        onChange={(e) => setNovaAgendaComentario(e.target.value)}
+                        rows={2}
+                      />
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          disabled={
+                            !novaAgendaData ||
+                            !novaAgendaComentario.trim() ||
+                            salvandoAgenda
+                          }
+                          onClick={async () => {
+                            if (!user || !aluno) return;
+                            setSalvandoAgenda(true);
+                            try {
+                              const { error } = await criarCompromissoAgenda(
+                                user.id,
+                                {
+                                  alunoId: aluno.id,
+                                  data: new Date(
+                                    `${novaAgendaData}T12:00:00`
+                                  ),
+                                  comentario: novaAgendaComentario,
+                                },
+                                areaAgenda
+                              );
+                              if (error) throw new Error(error);
+                              showToast("Compromisso criado.", "success");
+                              setCriandoAgenda(false);
+                              setNovaAgendaData("");
+                              setNovaAgendaComentario("");
+                              carregarAgendaVinculada();
+                            } catch (err) {
+                              showToast(
+                                err instanceof Error
+                                  ? err.message
+                                  : "Erro ao criar compromisso",
+                                "error"
+                              );
+                            } finally {
+                              setSalvandoAgenda(false);
+                            }
+                          }}
+                        >
+                          {salvandoAgenda ? "Salvando..." : "Salvar"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => setCriandoAgenda(false)}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    podeEditarCard && (
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        style={{ marginTop: "0.75rem" }}
+                        onClick={() => setCriandoAgenda(true)}
+                      >
+                        <Plus size={14} />
+                        Criar compromisso
+                      </button>
+                    )
                   )}
                 </div>
               )}
@@ -633,6 +918,18 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
       </div>
       {criandoVinculada && (
         <NovaMatriculaModal aluno={aluno} onClose={() => setCriandoVinculada(false)} />
+      )}
+      {modalTarefaAberto && aluno && (
+        <TarefaModal
+          onClose={() => {
+            setModalTarefaAberto(false);
+            carregarTarefasVinculadas();
+          }}
+          alunos={[{ id: aluno.id, name: aluno.name }]}
+          alunoIdFixo={aluno.id}
+          areaFixa={areaTarefas}
+          onSaved={carregarTarefasVinculadas}
+        />
       )}
     </div>,
     document.body

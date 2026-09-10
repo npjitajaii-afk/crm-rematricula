@@ -71,23 +71,87 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   /** Admin ou supervisor — gestão do polo inteiro (delegar, excluir, ver equipe). */
   const canGerenciarPolo = isAdmin || isSupervisor;
 
+  // Áreas já carregadas com sucesso (lazy load por funil).
   const areasCarregadasRef = useRef<Set<string>>(new Set());
+  // Evita duas requests paralelas da mesma área (login + troca de rota).
+  const areasEmCarregamentoRef = useRef<Map<string, Promise<void>>>(new Map());
   const location = useLocation();
 
-
-  // Detecta a área do funil que o usuário está abrindo (pela URL atual) pra
-  // priorizar essa busca primeiro. Lida direto com window.location (em vez
-  // de useLocation) de propósito: só precisa da rota no momento do login/
-  // refresh, e não deve disparar um novo carregamento completo sempre que o
-  // usuário navega entre abas depois — ver README.md, Bloco B.
+  // Detecta a área do funil pela URL. Usado no login e na navegação.
   const detectarAreaAtivaPelaRota = (pathname: string): Aluno["area"] | undefined => {
     if (pathname.startsWith("/retencao")) return "retencao";
     if (pathname.startsWith("/engajamento")) return "engajamento";
-    if (pathname.startsWith("/alunos") || pathname.startsWith("/meus-contatos"))
+    if (
+      pathname.startsWith("/alunos") ||
+      pathname.startsWith("/meus-contatos") ||
+      pathname.startsWith("/risco-evasao") ||
+      pathname.startsWith("/rematricula")
+    ) {
       return "rematricula";
-    return undefined; // outras rotas (início, métricas, etc.) não têm uma área única pra priorizar
+    }
+    return undefined; // dashboard, métricas, etc. — sem área prioritária
   };
 
+  /**
+   * Junta alunos de UMA área no estado sem apagar as outras.
+   * Antes o onPage fazia setAlunos(parcial) e zerava o outro funil
+   * quando as duas áreas carregavam em paralelo (sintoma: um funil
+   * cheio e o outro vazio até dar F5).
+   */
+  const mergeAlunosDaArea = useCallback(
+    (area: Aluno["area"], daArea: Aluno[]) => {
+      setAlunos((prev) => {
+        const outros = prev.filter((a) => a.area !== area);
+        // Evita duplicar ids caso a mesma área seja mergeada de novo.
+        const idsOutros = new Set(outros.map((a) => a.id));
+        const limpos = daArea.filter((a) => !idsOutros.has(a.id));
+        return [...outros, ...limpos];
+      });
+    },
+    []
+  );
+
+  /**
+   * Carrega uma área sob demanda (só se ainda não estiver no cache).
+   * Mantém o princípio: não busca tudo no login — só o funil ativo.
+   */
+  const ensureAreaLoaded = useCallback(
+    async (area: Aluno["area"]) => {
+      if (!user) return;
+      if (areasCarregadasRef.current.has(area)) return;
+
+      // Se já tem request em andamento pra essa área, reutiliza.
+      const emAndamento = areasEmCarregamentoRef.current.get(area);
+      if (emAndamento) {
+        await emAndamento;
+        return;
+      }
+
+      const promise = (async () => {
+        try {
+          const { alunos: daArea, error } = await getAlunos({
+            areaPrioritaria: area,
+            somenteAreaPrioritaria: true,
+          });
+          if (error) {
+            console.error("Erro ao carregar área", area, error);
+            // Não marca como carregada — permite retry na próxima navegação.
+            return;
+          }
+          mergeAlunosDaArea(area, daArea);
+          areasCarregadasRef.current.add(area);
+        } finally {
+          areasEmCarregamentoRef.current.delete(area);
+        }
+      })();
+
+      areasEmCarregamentoRef.current.set(area, promise);
+      await promise;
+    },
+    [user?.id, mergeAlunosDaArea]
+  );
+
+  // Login / troca de usuário: carrega meta + área da rota atual (lazy).
   useEffect(() => {
     let cancelado = false;
 
@@ -97,24 +161,24 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         setStatusResumo([]);
         setColaboradores([]);
         setPolos([]);
+        areasCarregadasRef.current = new Set();
+        areasEmCarregamentoRef.current = new Map();
         setIsLoadingAlunos(false);
         return;
       }
 
       setIsLoadingAlunos(true);
+      // Novo login: zera cache de áreas pra não misturar dados de sessão anterior.
+      areasCarregadasRef.current = new Set();
+      areasEmCarregamentoRef.current = new Map();
+      setAlunos([]);
+
       let primeiroLoteChegou = false;
+      const areaAtiva = detectarAreaAtivaPelaRota(window.location.pathname);
+      const areaInicial: Aluno["area"] = areaAtiva ?? "rematricula";
 
       try {
-        const areaAtiva = detectarAreaAtivaPelaRota(window.location.pathname);
-
-        // Antes: uma única query sem paginação trazia TODOS os alunos de
-        // TODAS as áreas com o histórico de interações aninhado, e só
-        // depois disso a tela desenhava (é a causa da lentidão logo após o
-        // login). Agora: busca em lotes, priorizando a área que o usuário
-        // está abrindo — a tela já libera assim que o primeiro lote chega,
-        // enquanto o restante continua carregando por trás.
-        // Meta (pipeline, colaboradores, polos) em paralelo com a 1ª página
-        // de alunos — não espera a lista inteira terminar.
+        // Meta em paralelo (não bloqueia a lista).
         const metaPromise = Promise.all([
           getPipelineResumo(),
           getColaboradoresService(),
@@ -138,39 +202,50 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
           }
         });
 
-        // Lista leve (sem interações). Só a área da rota no login —
-        // outras áreas sob demanda ao navegar (ver ensureAreaLoaded).
-        const { error } = await getAlunos({
-          // Sem rota de funil (ex: minha-área): começa por rematrícula, resto sob demanda.
-          areaPrioritaria: areaAtiva ?? "rematricula",
-          somenteAreaPrioritaria: true,
-          onPage: (parcial) => {
-            if (cancelado) return;
-            setAlunos(parcial);
-            if (!primeiroLoteChegou) {
-              primeiroLoteChegou = true;
-              setIsLoadingAlunos(false);
-            }
-          },
-        });
+        // Só a área da rota no login — outras sob demanda via ensureAreaLoaded.
+        // onPage faz MERGE por área (não substitui a lista inteira).
+        const carregarAreaInicial = async () => {
+          const { error } = await getAlunos({
+            areaPrioritaria: areaInicial,
+            somenteAreaPrioritaria: true,
+            onPage: (parcial) => {
+              if (cancelado) return;
+              mergeAlunosDaArea(areaInicial, parcial);
+              if (!primeiroLoteChegou) {
+                primeiroLoteChegou = true;
+                setIsLoadingAlunos(false);
+              }
+            },
+          });
+          return error;
+        };
+
+        // Marca em andamento pra o effect de rota não disparar request duplicada.
+        const promiseInicial = carregarAreaInicial();
+        areasEmCarregamentoRef.current.set(
+          areaInicial,
+          promiseInicial.then(() => undefined)
+        );
+
+        const error = await promiseInicial;
+        areasEmCarregamentoRef.current.delete(areaInicial);
 
         if (error) {
           console.error("Erro ao carregar alunos:", error);
-        } else {
-          areasCarregadasRef.current.add(areaAtiva ?? "rematricula");
+        } else if (!cancelado) {
+          areasCarregadasRef.current.add(areaInicial);
         }
 
         await metaPromise;
 
-        // Rede de segurança: se a 1ª tentativa veio vazia (JWT/RLS ainda
-        // não prontos no login), tenta uma vez mais sem cancelar a UI.
+        // Retry se JWT/RLS ainda não estavam prontos no 1º request (lista vazia).
         if (!cancelado && !primeiroLoteChegou) {
           const { error: err2 } = await getAlunos({
-            areaPrioritaria: areaAtiva ?? "rematricula",
+            areaPrioritaria: areaInicial,
             somenteAreaPrioritaria: true,
             onPage: (parcial) => {
               if (cancelado) return;
-              setAlunos(parcial);
+              mergeAlunosDaArea(areaInicial, parcial);
               if (!primeiroLoteChegou) {
                 primeiroLoteChegou = true;
                 setIsLoadingAlunos(false);
@@ -178,12 +253,9 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
             },
           });
           if (err2) console.error("Erro no retry de alunos:", err2);
-          else areasCarregadasRef.current.add(areaAtiva ?? "rematricula");
+          else if (!cancelado) areasCarregadasRef.current.add(areaInicial);
         }
       } finally {
-        // Rede de segurança: se não veio nenhum lote (ex: usuário sem
-        // nenhum aluno cadastrado ainda), garante que o loading não fica
-        // preso pra sempre.
         if (!cancelado) setIsLoadingAlunos(false);
       }
     };
@@ -193,55 +265,16 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     return () => {
       cancelado = true;
     };
-  }, [user?.id, isAdmin]);
+  }, [user?.id, isAdmin, mergeAlunosDaArea]);
 
-  /**
-   * Garante que os alunos de uma área estão no estado. No login só vem a
-   * área da rota; ao navegar para outra, busca só essa área (lista leve).
-   */
-  const ensureAreaLoaded = useCallback(
-    async (area: Aluno["area"]) => {
-      if (!user) return;
-      if (areasCarregadasRef.current.has(area)) return;
-
-      // Marca só depois do sucesso — se marcar antes e a request falhar/cancelar,
-      // a área fica "carregada" vazia até um F5.
-      const { alunos: daArea, error } = await getAlunos({
-        areaPrioritaria: area,
-        somenteAreaPrioritaria: true,
-      });
-      if (error) {
-        console.error("Erro ao carregar área", area, error);
-        return;
-      }
-      areasCarregadasRef.current.add(area);
-      setAlunos((prev) => {
-        const ids = new Set(prev.map((a) => a.id));
-        const novos = daArea.filter((a) => !ids.has(a.id));
-        return novos.length ? [...prev, ...novos] : prev;
-      });
-    },
-    [user?.id]
-  );
-
-  // Quando a rota muda, carrega a área correspondente se ainda não estiver no cache.
+  // Navegação entre funis: carrega a área se ainda não estiver no cache.
   useEffect(() => {
     if (!user) {
       areasCarregadasRef.current = new Set();
+      areasEmCarregamentoRef.current = new Map();
       return;
     }
-    const path = location.pathname;
-    let area: Aluno["area"] | undefined;
-    if (path.startsWith("/retencao")) area = "retencao";
-    else if (path.startsWith("/engajamento")) area = "engajamento";
-    else if (
-      path.startsWith("/alunos") ||
-      path.startsWith("/meus-contatos") ||
-      path.startsWith("/risco-evasao") ||
-      path.startsWith("/rematricula")
-    ) {
-      area = "rematricula";
-    }
+    const area = detectarAreaAtivaPelaRota(location.pathname);
     if (area) void ensureAreaLoaded(area);
   }, [user?.id, location.pathname, ensureAreaLoaded]);
 

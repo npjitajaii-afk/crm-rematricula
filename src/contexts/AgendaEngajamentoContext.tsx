@@ -1,11 +1,18 @@
 import React, { ReactNode, useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AgendaCompromisso } from "../types";
-import { AgendaArea, criarCompromissoAgenda, excluirCompromissoAgenda, getCompromissosAgenda } from "../services/agendaEngajamentoService";
+import {
+  AgendaArea,
+  criarCompromissoAgenda,
+  excluirCompromissoAgenda,
+  getCompromissosAgenda,
+} from "../services/agendaEngajamentoService";
 import { useAuth } from "../hooks/useAuth";
 import { AgendaEngajamentoContext } from "./agenda-engajamento-context";
 
-export const AgendaEngajamentoProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AgendaEngajamentoProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const { user } = useAuth();
   const { pathname } = useLocation();
   // Mesma regra de TarefasEngajamentoContext: rotas principais da
@@ -28,11 +35,24 @@ export const AgendaEngajamentoProvider: React.FC<{ children: ReactNode }> = ({ c
     pathname.includes("/painel-tarefas");
 
   const carregar = useCallback(async () => {
+    if (!user?.id) {
+      setCompromissos([]);
+      return;
+    }
     setIsLoading(true);
-    const { compromissos: lista } = await getCompromissosAgenda(area);
-    setCompromissos(lista);
+    // Isolamento por usuário: cada um vê só a própria agenda.
+    const { compromissos: lista, error } = await getCompromissosAgenda(
+      area,
+      user.id
+    );
+    if (error) {
+      console.error("Erro ao carregar agenda:", error);
+      setCompromissos([]);
+    } else {
+      setCompromissos(lista);
+    }
     setIsLoading(false);
-  }, [area]);
+  }, [area, user?.id]);
 
   useEffect(() => {
     if (!user) {
@@ -50,13 +70,20 @@ export const AgendaEngajamentoProvider: React.FC<{ children: ReactNode }> = ({ c
     comentario: string;
   }) => {
     if (!user) return;
-    const { compromisso, error } = await criarCompromissoAgenda(user.id, dados, area);
-    if (error || !compromisso) throw new Error(error || "Erro ao criar agendamento");
+    const { compromisso, error } = await criarCompromissoAgenda(
+      user.id,
+      dados,
+      area
+    );
+    if (error || !compromisso)
+      throw new Error(error || "Erro ao criar agendamento");
     setCompromissos((atual) => [...atual, compromisso]);
   };
 
   const excluirCompromisso = async (id: string) => {
-    const { error } = await excluirCompromissoAgenda(id, area);
+    if (!user) return;
+    // Só permite excluir o próprio compromisso.
+    const { error } = await excluirCompromissoAgenda(id, area, user.id);
     if (error) throw new Error(error);
     setCompromissos((atual) => atual.filter((item) => item.id !== id));
   };

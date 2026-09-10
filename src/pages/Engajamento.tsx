@@ -86,7 +86,8 @@ const Engajamento: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<string[]>(
     filters.status || []
   );
-  // Filtro por responsável (assignedTo). "" = Todos.
+  // Filtro por responsável (assignedTo).
+  // "" = Todos | "__sem__" = contatos sem responsável | uuid = colaborador
   const [selectedColaborador, setSelectedColaborador] = useState<string>(
     filters.assignedTo || ""
   );
@@ -360,6 +361,7 @@ const Engajamento: React.FC = () => {
               onChange={(e) => handleColaboradorFilter(e.target.value)}
             >
               <option value="">Todos</option>
+              <option value="__sem__">Sem responsável</option>
               {colaboradores.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
