@@ -591,15 +591,21 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     {
       field: "codigoAluno",
       aliases: [
-        "CODIGO_ALUNO", "RA", "MATRICULA", "NUMERO_MATRICULA", "COD_ALUNO",
-        "REGISTRO_ACADEMICO", "CODIGO_MATRICULA", "N_MATRICULA",
+        // Planilhas Uniasselvi / similares usam CD_ALUNO (não CODIGO_ALUNO)
+        "CD_ALUNO", "CDALUNO", "CODIGO_ALUNO", "COD_ALUNO", "CODIGOALUNO",
+        "RA", "MATRICULA", "NUMERO_MATRICULA", "N_MATRICULA", "NR_MATRICULA",
+        "REGISTRO_ACADEMICO", "CODIGO_MATRICULA", "ID_ALUNO", "NUM_ALUNO",
+        "NR_ALUNO", "MATRICULA_ALUNO",
       ],
-      keywords: ["MATRICULA", "REGISTRO"],
-      exclude: ["DATA", "STATUS", "SITUACAO"],
+      keywords: ["MATRICULA", "REGISTRO", "CD_ALUNO", "CODIGO_ALUNO"],
+      exclude: ["DATA", "STATUS", "SITUACAO", "CURSO"],
     },
     {
       field: "curso",
-      aliases: ["NOME_CURSO", "CURSO", "CURSO_ALUNO", "NOME_DO_CURSO"],
+      aliases: [
+        "NOME_CURSO", "CURSO", "CURSO_ALUNO", "NOME_DO_CURSO",
+        "CD_CURSO", "CODIGO_CURSO", "COD_CURSO",
+      ],
       keywords: ["CURSO"],
     },
     {
@@ -667,7 +673,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     ["EMAIL", "E_MAIL"],
     ["FONE", "TELEFONE", "CELULAR"],
     ["CURSO"],
-    ["RA", "MATRICULA"],
+    ["RA", "MATRICULA", "CD_ALUNO", "CODIGO_ALUNO"],
   ];
 
   /**

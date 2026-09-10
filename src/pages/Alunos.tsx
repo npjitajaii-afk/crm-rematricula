@@ -91,6 +91,11 @@ const Alunos: React.FC = () => {
   const [dateTo, setDateTo] = useState<string>(
     filters.dateTo ? new Date(filters.dateTo).toISOString().split("T")[0] : ""
   );
+  // Filtro por responsável (igual Engajamento).
+  // "" = Todos | "__sem__" = sem responsável | uuid = colaborador
+  const [selectedColaborador, setSelectedColaborador] = useState<string>(
+    filters.assignedTo || ""
+  );
   const [importProgress, setImportProgress] = useState<{
     done: number;
     total: number;
@@ -173,10 +178,20 @@ const Alunos: React.FC = () => {
     });
   };
 
+  const handleColaboradorFilter = (colaboradorId: string) => {
+    setSelectedColaborador(colaboradorId);
+    setCurrentPage(1);
+    setFilters({
+      ...filters,
+      assignedTo: colaboradorId || undefined,
+    });
+  };
+
   const handleClearFilters = () => {
     setSearchTerm("");
     setSelectedStatus([]);
     setSelectedSource([]);
+    setSelectedColaborador("");
     setDateFrom("");
     setDateTo("");
     setFilters({});
@@ -351,11 +366,13 @@ const Alunos: React.FC = () => {
           Filtros
           {(selectedStatus.length > 0 ||
             selectedSource.length > 0 ||
+            selectedColaborador ||
             dateFrom ||
             dateTo) && (
             <span className="filter-badge">
               {selectedStatus.length +
                 selectedSource.length +
+                (selectedColaborador ? 1 : 0) +
                 (dateFrom ? 1 : 0) +
                 (dateTo ? 1 : 0)}
             </span>
@@ -420,6 +437,23 @@ const Alunos: React.FC = () => {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="filter-group">
+            <label>Colaborador:</label>
+            <select
+              className="filter-select"
+              value={selectedColaborador}
+              onChange={(e) => handleColaboradorFilter(e.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="__sem__">Sem responsável</option>
+              {colaboradores.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="filter-actions">
