@@ -265,3 +265,15 @@
     flex: 1;
   }
 }
+.aluno-row-setor {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #4c1d95;
+  background: #ede9fe;
+  border-radius: 999px;
+  white-space: nowrap;
+}

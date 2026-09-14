@@ -22,6 +22,14 @@ export interface Polo {
   createdAt: Date;
 }
 
+/** Setor operacional do Engajamento, isolado por polo. */
+export interface Setor {
+  id: string;
+  nome: string;
+  poloId: string;
+  ativo: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -35,6 +43,13 @@ export interface User {
   /** Polo do colaborador. Admin pode ficar sem polo (vê todos). */
   poloId?: string;
   poloNome?: string;
+  /**
+   * Setor do colaborador no Engajamento.
+   * Obrigatório para colaborador com área engajamento.
+   * Admin e supervisor ficam sem setor (gerem o polo inteiro).
+   */
+  setorId?: string;
+  setorNome?: string;
 }
 
 export type StatusRematricula =
@@ -111,6 +126,12 @@ export interface Aluno {
   createdBy: string;
   poloId: string;
   poloNome?: string;
+  /**
+   * Setor do contato no Engajamento.
+   * Obrigatório quando area = 'engajamento'. NULL nas demais áreas.
+   */
+  setorId?: string;
+  setorNome?: string;
   /** ID da matrícula vinculada — mesmo aluno, outro curso/edital. */
   matriculaVinculadaId?: string;
 }
@@ -124,6 +145,8 @@ export interface AlunoFilters {
   dateTo?: Date;
   assignedTo?: string;
   poloId?: string;
+  /** Filtra contatos de engajamento por setor. */
+  setorId?: string;
 }
 
 export type ToastType = "success" | "error" | "info";
@@ -414,6 +437,9 @@ export interface Usuario {
   areasPermitidas: Area[];
   poloId?: string;
   poloNome?: string;
+  /** Setor no Engajamento (obrigatório se colaborador com área engajamento). */
+  setorId?: string;
+  setorNome?: string;
   createdAt: Date;
 }
 
@@ -459,7 +485,8 @@ export interface AlunosContextType {
   ) => Promise<{ imported: number; duplicados: number }>;
   importAlunosEngajamento: (
     file: File,
-    onProgress?: (done: number, total: number) => void
+    onProgress?: (done: number, total: number) => void,
+    options?: { setorId?: string | null }
   ) => Promise<{ imported: number; ignored: number; duplicados: number }>;
   exportAlunos: (options?: {
     area?: Area;
@@ -470,6 +497,54 @@ export interface AlunosContextType {
   /** true para quem pode gerenciar o polo inteiro: admin ou supervisor */
   canGerenciarPolo: boolean;
   statusResumo: PipelineStatusResumo[];
-  colaboradores: { id: string; name: string; email: string; poloId?: string; poloNome?: string }[];
+  colaboradores: {
+    id: string;
+    name: string;
+    email: string;
+    poloId?: string;
+    poloNome?: string;
+    setorId?: string;
+    setorNome?: string;
+  }[];
   polos: Polo[];
+  /** Setores ativos do polo do usuário (ou todos, se admin). */
+  setores: Setor[];
+}
+
+/** Tipo de pedido de transferência de contato (Engajamento). */
+export type SolicitacaoTransferenciaTipo =
+  | "mudanca_setor"
+  | "assumir_responsabilidade";
+
+/** Status do fluxo de aprovação da transferência. */
+export type SolicitacaoTransferenciaStatus =
+  | "aguardando_responsavel"
+  | "aguardando_gestor"
+  | "aprovada"
+  | "recusada"
+  | "cancelada";
+
+/** Pedido de transferência de setor/responsável com aprovação. */
+export interface SolicitacaoTransferencia {
+  id: string;
+  alunoId: string;
+  alunoNome?: string;
+  poloId?: string;
+  solicitanteId: string;
+  solicitanteNome?: string;
+  tipo: SolicitacaoTransferenciaTipo;
+  setorDestinoId: string;
+  setorDestinoNome?: string;
+  colaboradorDestinoId?: string;
+  colaboradorDestinoNome?: string;
+  setorOrigemId?: string;
+  setorOrigemNome?: string;
+  responsavelOrigemId?: string;
+  responsavelOrigemNome?: string;
+  status: SolicitacaoTransferenciaStatus;
+  motivo?: string;
+  observacaoDecisao?: string;
+  autorizadoEm?: string;
+  decididoEm?: string;
+  createdAt: string;
 }

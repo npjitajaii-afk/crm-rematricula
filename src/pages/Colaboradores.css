@@ -507,3 +507,61 @@
     justify-self: start;
   }
 }
+/* Agrupamento por setor */
+.colab-setores-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.colab-setor-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1rem 1.1rem 1.15rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.colab-setor-card--sem {
+  border-style: dashed;
+  background: #fafafa;
+}
+
+.colab-setor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.colab-setor-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: #1f2937;
+}
+
+.colab-setor-count {
+  font-size: 0.8rem;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+}
+
+.colab-setor-vazio {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #9ca3af;
+  padding: 0.35rem 0 0.15rem;
+}
+
+.colab-setor-card .colab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}

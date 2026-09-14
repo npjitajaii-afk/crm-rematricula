@@ -34,6 +34,7 @@ import {
   getSourceLabel,
   getStatusColor,
 } from "../utils/formatters";
+import { parseAnotacoes } from "../utils/observacoes";
 import "./AlunoDetails.css";
 
 const AlunoDetails: React.FC = () => {
@@ -331,12 +332,40 @@ const AlunoDetails: React.FC = () => {
               </div>
             )}
 
-            {aluno.observations && (
-              <div className="lead-observations">
-                <span className="info-label">Observações:</span>
-                <p>{aluno.observations}</p>
-              </div>
-            )}
+            {aluno.observations && (() => {
+              const anotacoes = parseAnotacoes(aluno.observations);
+              if (anotacoes.length === 0) return null;
+              return (
+                <div className="lead-observations">
+                  <span className="info-label">Observações:</span>
+                  <div className="lead-anotacoes-lista">
+                    {anotacoes.map((a) => (
+                      <div key={a.id} className="lead-anotacao-item">
+                        {(a.autorNome && a.autorNome !== "—") || a.criadaEm ? (
+                          <div className="lead-anotacao-meta">
+                            {a.autorNome && a.autorNome !== "—" && (
+                              <span className="lead-anotacao-autor">{a.autorNome}</span>
+                            )}
+                            {a.criadaEm && (
+                              <span className="lead-anotacao-data">
+                                {new Date(a.criadaEm).toLocaleString("pt-BR", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "2-digit",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
+                        <p className="lead-anotacao-texto">{a.texto}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Histórico de Interações */}

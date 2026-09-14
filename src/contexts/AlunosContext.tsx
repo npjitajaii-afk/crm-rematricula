@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, ReactNode, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { Aluno, AlunoFilters, Interacao, PipelineStatusResumo, Area, AlunoStatus, CanalContato, Polo } from "../types";
+import { Aluno, AlunoFilters, Interacao, PipelineStatusResumo, Area, AlunoStatus, CanalContato, Polo, Setor } from "../types";
 import {
   getAlunos,
   getAlunoById,
@@ -18,6 +18,7 @@ import {
   addInteraction as addInteractionService,
 } from "../services/alunosService";
 import { getPolos as getPolosService } from "../services/polosService";
+import { getSetoresPolo as getSetoresPoloService } from "../services/setoresService";
 import { useAuth } from "../hooks/useAuth";
 import { AlunosContext } from "./alunos-context";
 import {
@@ -62,9 +63,18 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   const [filters, setFilters] = useState<AlunoFilters>({});
   const [statusResumo, setStatusResumo] = useState<PipelineStatusResumo[]>([]);
   const [colaboradores, setColaboradores] = useState<
-    { id: string; name: string; email: string; poloId?: string; poloNome?: string }[]
+    {
+      id: string;
+      name: string;
+      email: string;
+      poloId?: string;
+      poloNome?: string;
+      setorId?: string;
+      setorNome?: string;
+    }[]
   >([]);
   const [polos, setPolos] = useState<Polo[]>([]);
+  const [setores, setSetores] = useState<Setor[]>([]);
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const isSupervisor = user?.role === "supervisor";
@@ -161,6 +171,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         setStatusResumo([]);
         setColaboradores([]);
         setPolos([]);
+        setSetores([]);
         areasCarregadasRef.current = new Set();
         areasEmCarregamentoRef.current = new Map();
         setIsLoadingAlunos(false);
@@ -183,7 +194,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
           getPipelineResumo(),
           getColaboradoresService(),
           getPolosService(),
-        ]).then(([pipelineRes, colabRes, polosRes]) => {
+          getSetoresPoloService(),
+        ]).then(([pipelineRes, colabRes, polosRes, setoresRes]) => {
           if (cancelado) return;
           if (pipelineRes.error) {
             console.error("Erro ao carregar resumo do pipeline:", pipelineRes.error);
@@ -199,6 +211,11 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
             console.error("Erro ao carregar polos:", polosRes.error);
           } else {
             setPolos(polosRes.polos);
+          }
+          if (setoresRes.error) {
+            console.error("Erro ao carregar setores:", setoresRes.error);
+          } else {
+            setSetores(setoresRes.setores);
           }
         });
 
@@ -288,6 +305,15 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
           >
     ) => {
       if (!user) return;
+      // A migration 028 tornou polo_id obrigatório no banco (trigger recusa
+      // aluno sem polo_id). Um admin sem polo cadastrado não consegue mais
+      // criar alunos — melhor barrar aqui com mensagem clara do que deixar
+      // o INSERT estourar um erro genérico de trigger no banco.
+      if (!user.poloId) {
+        throw new Error(
+          "Seu usuário não tem um polo definido. Peça a outro admin para configurar seu polo antes de cadastrar alunos."
+        );
+      }
 
       const alunoData = {
         ...newAluno,
@@ -562,6 +588,10 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         if (aluno.poloId !== filters.poloId) return false;
       }
 
+      if (filters.setorId) {
+        if (aluno.setorId !== filters.setorId) return false;
+      }
+
       return true;
     });
   }, [alunos, filters]);
@@ -682,7 +712,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
    */
   const rowToAlunoData = (
     rawRow: unknown,
-    userId: string
+    userId: string,
+    poloId: string
   ): Omit<Aluno, "id" | "createdAt" | "updatedAt" | "interactions"> | null => {
     const r = normalizeRow(rawRow as Record<string, unknown>);
     const campos = pickFields(r, REMATRICULA_FIELD_SPECS);
@@ -738,7 +769,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       // Sem isso, o INSERT cai no polo padrão (Itajaí) via DEFAULT da
       // coluna — não no polo de quem está importando. Todo aluno criado
       // (inclusive por admin) fica no polo de quem o criou.
-      poloId: user?.poloId,
+      poloId,
       tags,
       createdBy: userId,
     };
@@ -750,8 +781,14 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   const importAlunos = useCallback(async (
     file: File,
     onProgress?: (done: number, total: number) => void
-  ): Promise<void> => {
+  ): Promise<{ imported: number; duplicados: number }> => {
     if (!user) throw new Error("Usuário não autenticado");
+    if (!user.poloId) {
+      throw new Error(
+        "Seu usuário não tem um polo definido. Peça a outro admin para configurar seu polo antes de importar alunos."
+      );
+    }
+    const poloId = user.poloId;
 
     const jsonData: unknown[] = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -791,7 +828,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     });
 
     const alunosData = jsonData
-      .map((rawRow) => rowToAlunoData(rawRow, user.id))
+      .map((rawRow) => rowToAlunoData(rawRow, user.id, poloId))
       .filter(
         (a): a is Omit<Aluno, "id" | "createdAt" | "updatedAt" | "interactions"> =>
           a !== null
@@ -906,9 +943,14 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   /** Importa a aba comercial e cria cards apenas para o polo de Itajaí. */
   const importAlunosEngajamento = useCallback(async (
     file: File,
-    onProgress?: (done: number, total: number) => void
-  ): Promise<{ imported: number; ignored: number }> => {
+    onProgress?: (done: number, total: number) => void,
+    options?: { setorId?: string | null }
+  ): Promise<{ imported: number; ignored: number; duplicados: number }> => {
     if (!user) throw new Error("Usuário não autenticado");
+    const setorImportacao =
+      options && options.setorId !== undefined && options.setorId !== ""
+        ? options.setorId
+        : null;
 
     const jsonData: unknown[] = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -969,6 +1011,14 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     const poloItajai = polos.find((p) =>
       p.nome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("itajai")
     );
+    // Essa importação é específica do polo de Itajaí (ver mensagem de erro
+    // abaixo). Sem o polo cadastrado, não há poloId válido pra gravar nos
+    // alunos — e a migration 028 agora rejeita aluno sem polo_id no banco.
+    if (!poloItajai) {
+      throw new Error(
+        "Polo Itajaí não encontrado. Cadastre o polo antes de importar esta planilha."
+      );
+    }
 
     const alunosData = jsonData.map((rawRow) => {
       const row = normalizeRow(rawRow as Record<string, unknown>);
@@ -1004,7 +1054,9 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
         observations: observacoes || undefined,
         tags: [`Polo: ${polo}`, cpf && `CPF: ${cpf}`, tipoEntrada].filter(Boolean),
         createdBy: user.id,
-        ...(poloItajai ? { poloId: poloItajai.id } : {}),
+        poloId: poloItajai.id,
+        // Setor escolhido na importação (null = sem setor)
+        ...(setorImportacao ? { setorId: setorImportacao } : { setorId: undefined }),
       };
       return aluno;
     }).filter((aluno): aluno is Omit<Aluno, "id" | "createdAt" | "updatedAt" | "interactions"> => aluno !== null);
@@ -1118,6 +1170,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       statusResumo,
       colaboradores,
       polos,
+      setores,
     }),
     [
       alunos,
@@ -1134,6 +1187,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       getAluno,
       filteredAlunos,
       filters,
+      setFilters,
       importAlunos,
       importAlunosEngajamento,
       exportAlunos,
@@ -1143,6 +1197,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       statusResumo,
       colaboradores,
       polos,
+      setores,
     ]
   );
 

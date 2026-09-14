@@ -9,13 +9,17 @@ interface ProfileRow {
   status: string;
   areas_permitidas: string[] | null;
   polo_id: string | null;
+  setor_id: string | null;
   polos: { nome: string } | { nome: string }[] | null;
+  setores: { nome: string } | { nome: string }[] | null;
   created_at: string;
 }
 
 function mapRowToUsuario(row: ProfileRow): Usuario {
   const poloJoin = row.polos;
   const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;
+  const setorJoin = row.setores;
+  const setorNome = Array.isArray(setorJoin) ? setorJoin[0]?.nome : setorJoin?.nome;
 
   return {
     id: row.id,
@@ -26,6 +30,8 @@ function mapRowToUsuario(row: ProfileRow): Usuario {
     areasPermitidas: (row.areas_permitidas ?? []) as Area[],
     poloId: row.polo_id ?? undefined,
     poloNome,
+    setorId: row.setor_id ?? undefined,
+    setorNome,
     createdAt: new Date(row.created_at),
   };
 }
@@ -40,7 +46,9 @@ export async function getUsuarios(): Promise<{ usuarios: Usuario[]; error: strin
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, email, role, status, areas_permitidas, polo_id, polos(nome), created_at')
+      .select(
+        'id, name, email, role, status, areas_permitidas, polo_id, setor_id, polos(nome), setores(nome), created_at'
+      )
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -154,5 +162,29 @@ export async function definirPoloUsuario(
     return { error: null };
   } catch {
     return { error: 'Erro ao atualizar polo do usuário' };
+  }
+}
+/**
+ * Atribui o setor de um colaborador no Engajamento (admin-only, protegido no banco).
+ * Obrigatório antes de aprovar colaborador com área engajamento.
+ * Admin/supervisor devem ficar com setor_id NULL.
+ */
+export async function definirSetorUsuario(
+  userId: string,
+  setorId: string | null
+): Promise<{ error: string | null }> {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ setor_id: setorId })
+      .eq('id', userId);
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    return { error: null };
+  } catch {
+    return { error: 'Erro ao atualizar setor do usuário' };
   }
 }

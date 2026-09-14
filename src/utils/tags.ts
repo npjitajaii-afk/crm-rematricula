@@ -1,3 +1,5 @@
+import type { Area } from "../types";
+
 // Tags disponíveis na área de Rematrícula.
 export const TAGS_REMATRICULA = [
   "Calouro",
@@ -44,10 +46,9 @@ export const TAGS_DISPONIVEIS: TagAluno[] = Array.from(
 // Matrícula" fica de fora porque é aplicada automaticamente pelo sistema no
 // cadastro via Engajamento (ver README.md seção 4) e nunca deve ser marcada
 // à mão.
-export const TAGS_SELECIONAVEIS_POR_AREA: Record<
-  "rematricula" | "engajamento",
-  TagAluno[]
-> = {
+export const TAGS_SELECIONAVEIS_POR_AREA: Partial<Record<Area, TagAluno[]>> = {
   rematricula: TAGS_REMATRICULA.filter((tag) => tag !== "Nova Matrícula"),
   engajamento: TAGS_ENGAJAMENTO.filter((tag) => tag !== "Nova Matrícula"),
+  // "retencao" ainda não tem tags próprias definidas; cai no fallback []
+  // em quem consome este map (ver AlunoForm.tsx e AlunoExpandModal.tsx).
 };

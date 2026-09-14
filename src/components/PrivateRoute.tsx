@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useInactivityLogout } from "../hooks/useInactivityLogout";
 import { Loader2 } from "lucide-react";
 
 interface PrivateRouteProps {
@@ -9,6 +10,9 @@ interface PrivateRouteProps {
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
+
+  // 1 hora sem clique → encerra sessão e pede login de novo
+  useInactivityLogout();
 
   if (isLoading) {
     return (

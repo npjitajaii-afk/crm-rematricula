@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from "react";
 import { useNavigate, NavigateFunction } from "react-router-dom";
 import { useAlunos } from "../hooks/useAlunos";
+import { useAuth } from "../hooks/useAuth";
 import { Aluno, AlunoStatus } from "../types";
 import {
   UsersRound,
@@ -26,6 +27,7 @@ import {
   getSourceLabel,
 } from "../utils/formatters";
 import "./Colaboradores.css";
+import { flattenObservacoes } from "../utils/observacoes";
 
 const STATUS_LIST = [
   { value: "cadastrado", label: "Cadastrado" },
@@ -182,8 +184,10 @@ const ColabAlunoRow: React.FC<ColabAlunoRowProps> = ({ aluno, navigate }) => {
                 <span className="aluno-detail-label">
                   <FileText size={13} /> Observações
                 </span>
-                <p className="aluno-detail-text">
-                  {aluno.observations || "Nenhuma observação registrada."}
+                <p className="aluno-detail-text" style={{ whiteSpace: "pre-wrap" }}>
+                  {aluno.observations
+                    ? flattenObservacoes(aluno.observations)
+                    : "Nenhuma observação registrada."}
                 </p>
               </div>
 
@@ -277,7 +281,8 @@ const ColabAlunosTable: React.FC<ColabAlunosTableProps> = ({ alunos, navigate })
 };
 
 const Colaboradores: React.FC = () => {
-  const { alunos, colaboradores } = useAlunos();
+  const { alunos, colaboradores, setores } = useAlunos();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [expandedColaborador, setExpandedColaborador] = useState<string | null>(null);
@@ -294,13 +299,24 @@ const Colaboradores: React.FC = () => {
         email: string;
         poloId?: string;
         poloNome?: string;
+        setorId?: string;
+        setorNome?: string;
         alunos: typeof alunos;
       }
     > = {};
 
     // Inicializa todos os colaboradores registrados (já filtrados por polo pelo RLS)
     colaboradores.forEach((c) => {
-      map[c.id] = { ...c, alunos: [] };
+      map[c.id] = {
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        poloId: c.poloId,
+        poloNome: c.poloNome,
+        setorId: c.setorId,
+        setorNome: c.setorNome,
+        alunos: [],
+      };
     });
 
     // Distribui os alunos
@@ -324,9 +340,54 @@ const Colaboradores: React.FC = () => {
       colaboradoresData.filter(
         (c) =>
           c.name.toLowerCase().includes(search.toLowerCase()) ||
-          c.email.toLowerCase().includes(search.toLowerCase())
+          c.email.toLowerCase().includes(search.toLowerCase()) ||
+          (c.setorNome || "").toLowerCase().includes(search.toLowerCase())
       ),
     [colaboradoresData, search]
+  );
+
+  /** Setores ativos do polo do usuário (os 3 operacionais — sem Geral). */
+  const setoresAtivos = useMemo(
+    () =>
+      (setores || [])
+        .filter((s) => {
+          if (s.nome === "Geral") return false;
+          // Admin/supervisor: só setores do próprio polo (evita Comercial x N polos)
+          if (user?.poloId) return s.poloId === user.poloId;
+          return true;
+        })
+        .slice()
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+    [setores, user?.poloId]
+  );
+
+  /** Colaboradores agrupados por setor (só quem tem setor). */
+  const gruposPorSetor = useMemo(() => {
+    const grupos = setoresAtivos.map((s) => ({
+      setorId: s.id,
+      nome: s.nome,
+      colaboradores: filteredColaboradores.filter((c) => {
+        if (c.setorId && c.setorId === s.id) return true;
+        // Fallback se só veio o nome do setor
+        if (!c.setorId && c.setorNome && c.setorNome === s.nome) return true;
+        return false;
+      }),
+    }));
+    return grupos;
+  }, [setoresAtivos, filteredColaboradores]);
+
+  const colabsSemSetor = useMemo(
+    () =>
+      filteredColaboradores.filter((c) => {
+        if (c.setorId) {
+          return !setoresAtivos.some((s) => s.id === c.setorId);
+        }
+        if (c.setorNome) {
+          return !setoresAtivos.some((s) => s.nome === c.setorNome);
+        }
+        return true;
+      }),
+    [filteredColaboradores, setoresAtivos]
   );
 
   const toggle = (id: string) =>
@@ -339,6 +400,7 @@ const Colaboradores: React.FC = () => {
     });
     return totals;
   };
+
 
   return (
     <div className="colab-page">
@@ -361,7 +423,6 @@ const Colaboradores: React.FC = () => {
         </div>
       </div>
 
-      {/* Busca */}
       <div className="colab-search-wrapper">
         <Search size={16} className="colab-search-icon" />
         <input
@@ -372,128 +433,222 @@ const Colaboradores: React.FC = () => {
         />
       </div>
 
-      {/* Cards de colaboradores */}
-      <div className="colab-list">
-        {filteredColaboradores.map((colab) => {
-          const resumo = getResumo(colab.alunos);
-          const isOpen = expandedColaborador === colab.id;
-          const rematriculados = resumo["rematriculado"] || 0;
-          const taxa =
-            colab.alunos.length > 0
-              ? Math.round((rematriculados / colab.alunos.length) * 100)
-              : 0;
+      <div className="colab-setores-grid">
+        {gruposPorSetor.map((grupo) => (
+          <section key={grupo.setorId} className="colab-setor-card">
+            <div className="colab-setor-header">
+              <h2 className="colab-setor-title">{grupo.nome}</h2>
+              <span className="colab-setor-count">
+                {grupo.colaboradores.length}{" "}
+                {grupo.colaboradores.length === 1 ? "colaborador" : "colaboradores"}
+              </span>
+            </div>
 
-          return (
-            <div key={colab.id} className={`colab-card ${isOpen ? "open" : ""}`}>
-              {/* Cabeçalho do colaborador */}
-              <div
-                className="colab-card-header"
-                onClick={() => toggle(colab.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    toggle(colab.id);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-expanded={isOpen}
-              >
-                <div className="colab-card-header-top">
-                  <div className="colab-identity">
-                    <div className="colab-avatar">
-                      {colab.name.charAt(0).toUpperCase()}
-                    </div>
-                    <p className="colab-name">{colab.name}</p>
-                    {colab.poloNome && (
-                      <p className="colab-email">Polo: {colab.poloNome}</p>
-                    )}
-                  </div>
+            {grupo.colaboradores.length === 0 ? (
+              <p className="colab-setor-vazio">Nenhum colaborador neste setor.</p>
+            ) : (
+              <div className="colab-list">
+                {grupo.colaboradores.map((colab) => {
+                  const resumo = getResumo(colab.alunos);
+                  const isOpen = expandedColaborador === colab.id;
+                  const rematriculados = resumo["rematriculado"] || 0;
+                  const taxa =
+                    colab.alunos.length > 0
+                      ? Math.round((rematriculados / colab.alunos.length) * 100)
+                      : 0;
 
-                  <div className="colab-card-meta">
-                    <div className="colab-numbers">
-                      <span className="colab-total">{colab.alunos.length} contatos</span>
-                      {colab.alunos.length > 0 && (
-                        <span className="colab-taxa" style={{ color: taxa >= 50 ? "#15803d" : "var(--primary)" }}>
-                          {taxa}% rematric.
-                        </span>
+                  return (
+                    <div key={colab.id} className={`colab-card ${isOpen ? "open" : ""}`}>
+                      <div
+                        className="colab-card-header"
+                        onClick={() => toggle(colab.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            toggle(colab.id);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isOpen}
+                      >
+                        <div className="colab-card-header-top">
+                          <div className="colab-identity">
+                            <div className="colab-avatar">
+                              {colab.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="colab-name">{colab.name}</p>
+                              {colab.poloNome && (
+                                <p className="colab-email">Polo: {colab.poloNome}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="colab-card-meta">
+                            <div className="colab-numbers">
+                              <span className="colab-total">
+                                {colab.alunos.length} contatos
+                              </span>
+                              {colab.alunos.length > 0 && (
+                                <span
+                                  className="colab-taxa"
+                                  style={{
+                                    color: taxa >= 50 ? "#15803d" : "var(--primary)",
+                                  }}
+                                >
+                                  {taxa}% rematric.
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              className="colab-expand-btn"
+                              aria-label={isOpen ? "Recolher" : "Expandir"}
+                            >
+                              {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="colab-status-row">
+                          {STATUS_LIST.map((s) =>
+                            resumo[s.value] ? (
+                              <span
+                                key={s.value}
+                                className="colab-status-chip"
+                                style={{
+                                  backgroundColor:
+                                    getStatusColor(s.value as AlunoStatus) + "22",
+                                  color: getStatusColor(s.value as AlunoStatus),
+                                  borderColor:
+                                    getStatusColor(s.value as AlunoStatus) + "55",
+                                }}
+                                title={getStatusLabel(s.value)}
+                              >
+                                {resumo[s.value]} {s.label}
+                              </span>
+                            ) : null
+                          )}
+                        </div>
+                      </div>
+
+                      {isOpen && (
+                        <ColabAlunosTable alunos={colab.alunos} navigate={navigate} />
                       )}
                     </div>
-
-                    <button type="button" className="colab-toggle-btn" tabIndex={-1} aria-hidden="true">
-                      {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Mini pipeline por status */}
-                <div className="colab-status-row">
-                  {STATUS_LIST.map((s) =>
-                    resumo[s.value] ? (
-                      <span
-                        key={s.value}
-                        className="colab-status-chip"
-                        style={{
-                          backgroundColor: getStatusColor(s.value as AlunoStatus) + "22",
-                          color: getStatusColor(s.value as AlunoStatus),
-                          borderColor: getStatusColor(s.value as AlunoStatus) + "55",
-                        }}
-                        title={getStatusLabel(s.value)}
-                      >
-                        {resumo[s.value]} {s.label}
-                      </span>
-                    ) : null
-                  )}
-                </div>
+                  );
+                })}
               </div>
-
-              {/* Tabela expandida (arrastável para os lados) */}
-              {isOpen && <ColabAlunosTable alunos={colab.alunos} navigate={navigate} />}
-            </div>
-          );
-        })}
-
-        {/* Seção: sem responsável */}
-        {semResponsavel.length > 0 && (
-          <div className={`colab-card sem-resp-card ${expandedColaborador === "__sem__" ? "open" : ""}`}>
-            <div
-              className="colab-card-header"
-              onClick={() => toggle("__sem__")}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  toggle("__sem__");
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              aria-expanded={expandedColaborador === "__sem__"}
-            >
-              <div className="colab-card-header-top">
-                <div className="colab-identity">
-                  <div className="colab-avatar colab-avatar-sem">
-                    <UserX size={18} />
-                  </div>
-                  <div>
-                    <p className="colab-name">Sem Responsável</p>
-                    <p className="colab-email">Contatos ainda não atribuídos</p>
-                  </div>
-                </div>
-                <div className="colab-card-meta">
-                  <span className="colab-total">{semResponsavel.length} contatos</span>
-                  <button type="button" className="colab-toggle-btn" tabIndex={-1} aria-hidden="true">
-                    {expandedColaborador === "__sem__" ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {expandedColaborador === "__sem__" && (
-              <ColabAlunosTable alunos={semResponsavel} navigate={navigate} />
             )}
-          </div>
+          </section>
+        ))}
+
+        {colabsSemSetor.length > 0 && (
+          <section className="colab-setor-card colab-setor-card--sem">
+            <div className="colab-setor-header">
+              <h2 className="colab-setor-title">Sem setor</h2>
+              <span className="colab-setor-count">
+                {colabsSemSetor.length}{" "}
+                {colabsSemSetor.length === 1 ? "colaborador" : "colaboradores"}
+              </span>
+            </div>
+            <div className="colab-list">
+              {colabsSemSetor.map((colab) => {
+                const isOpen = expandedColaborador === colab.id;
+                return (
+                  <div key={colab.id} className={`colab-card ${isOpen ? "open" : ""}`}>
+                    <div
+                      className="colab-card-header"
+                      onClick={() => toggle(colab.id)}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isOpen}
+                    >
+                      <div className="colab-card-header-top">
+                        <div className="colab-identity">
+                          <div className="colab-avatar">
+                            {colab.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="colab-name">{colab.name}</p>
+                            {colab.poloNome && (
+                              <p className="colab-email">Polo: {colab.poloNome}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="colab-card-meta">
+                          <span className="colab-total">{colab.alunos.length} contatos</span>
+                          <button type="button" className="colab-expand-btn">
+                            {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    {isOpen && (
+                      <ColabAlunosTable alunos={colab.alunos} navigate={navigate} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         )}
       </div>
+
+      {semResponsavel.length > 0 && (
+        <div
+          className={`colab-card sem-resp-card ${
+            expandedColaborador === "__sem__" ? "open" : ""
+          }`}
+          style={{ marginTop: "1.25rem" }}
+        >
+          <div
+            className="colab-card-header"
+            onClick={() => toggle("__sem__")}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggle("__sem__");
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-expanded={expandedColaborador === "__sem__"}
+          >
+            <div className="colab-card-header-top">
+              <div className="colab-identity">
+                <div className="colab-avatar colab-avatar-sem">
+                  <UserX size={18} />
+                </div>
+                <div>
+                  <p className="colab-name">Sem Responsável</p>
+                  <p className="colab-email">Contatos ainda não atribuídos</p>
+                </div>
+              </div>
+              <div className="colab-card-meta">
+                <span className="colab-total">{semResponsavel.length} contatos</span>
+                <button
+                  type="button"
+                  className="colab-toggle-btn"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                >
+                  {expandedColaborador === "__sem__" ? (
+                    <ChevronUp size={18} />
+                  ) : (
+                    <ChevronDown size={18} />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {expandedColaborador === "__sem__" && (
+            <ColabAlunosTable alunos={semResponsavel} navigate={navigate} />
+          )}
+        </div>
+      )}
     </div>
   );
 };

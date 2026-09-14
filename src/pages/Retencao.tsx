@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAlunos } from "../hooks/useAlunos";
-import { Search, LifeBuoy } from "lucide-react";
+import { LifeBuoy } from "lucide-react";
 import SearchBox from "../components/SearchBox";
 import KanbanBoard from "../components/kanban/KanbanBoard";
 import "./Alunos.css";

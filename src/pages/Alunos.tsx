@@ -6,7 +6,6 @@ import { useConfirm } from "../hooks/useConfirm";
 import { useNavigate } from "react-router-dom";
 import { AlunoStatus, CanalContato } from "../types";
 import {
-  Search,
   Plus,
   Filter,
   Download,
@@ -318,7 +317,7 @@ const Alunos: React.FC = () => {
               Excluir selecionados ({selectedIds.length})
             </button>
           )}
-          <button className="btn btn-secondary" onClick={exportAlunos}>
+          <button className="btn btn-secondary" onClick={() => exportAlunos()}>
             <Download size={18} />
             Exportar
           </button>

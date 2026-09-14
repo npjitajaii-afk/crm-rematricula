@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getUsuarios, definirStatusUsuario, definirAreasUsuario, definirPoloUsuario, definirRoleUsuario } from "../services/usuariosService";
+import {
+  getUsuarios,
+  definirStatusUsuario,
+  definirAreasUsuario,
+  definirPoloUsuario,
+  definirRoleUsuario,
+  definirSetorUsuario,
+} from "../services/usuariosService";
 import { Usuario, Area, UserRole } from "../types";
 import { AREA_CONFIG } from "../config/areas";
 import { useToast } from "../hooks/useToast";
@@ -13,6 +20,8 @@ import {
   ShieldCheck,
   Loader2,
   UserX,
+  Search,
+  MapPin,
 } from "lucide-react";
 import { formatDate } from "../utils/formatters";
 import "./Usuarios.css";
@@ -42,11 +51,14 @@ const STATUS_INFO: Record<Usuario["status"], { label: string; className: string 
 const Usuarios: React.FC = () => {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
-  const { polos } = useAlunos();
+  const { polos, setores } = useAlunos();
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
+  /** null = todos os polos; "__sem__" = sem polo; uuid = polo específico */
+  const [poloFiltro, setPoloFiltro] = useState<string | null>(null);
 
   const carregar = async () => {
     setIsLoading(true);
@@ -64,8 +76,68 @@ const Usuarios: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pendentes = useMemo(() => usuarios.filter((u) => u.status === "pendente"), [usuarios]);
-  const demais = useMemo(() => usuarios.filter((u) => u.status !== "pendente"), [usuarios]);
+  const termoBusca = busca.trim().toLowerCase();
+
+  const passaBusca = (u: Usuario) => {
+    if (!termoBusca) return true;
+    return (
+      u.name.toLowerCase().includes(termoBusca) ||
+      u.email.toLowerCase().includes(termoBusca)
+    );
+  };
+
+  const passaPolo = (u: Usuario) => {
+    if (poloFiltro === null) return true;
+    if (poloFiltro === "__sem__") return !u.poloId;
+    return u.poloId === poloFiltro;
+  };
+
+  const pendentes = useMemo(
+    () => usuarios.filter((u) => u.status === "pendente" && passaBusca(u) && passaPolo(u)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [usuarios, termoBusca, poloFiltro]
+  );
+
+  const demais = useMemo(
+    () => usuarios.filter((u) => u.status !== "pendente" && passaBusca(u) && passaPolo(u)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [usuarios, termoBusca, poloFiltro]
+  );
+
+  /** Agrupa os demais usuários por polo (card por polo). */
+  const gruposPorPolo = useMemo(() => {
+    const mapa = new Map<string, { poloId: string | null; nome: string; usuarios: Usuario[] }>();
+    for (const u of demais) {
+      const key = u.poloId || "__sem__";
+      if (!mapa.has(key)) {
+        const nome =
+          key === "__sem__"
+            ? "Sem polo"
+            : polos.find((p) => p.id === u.poloId)?.nome || "Polo";
+        mapa.set(key, { poloId: u.poloId || null, nome, usuarios: [] });
+      }
+      mapa.get(key)!.usuarios.push(u);
+    }
+    // Ordena: polos por nome, "Sem polo" no fim
+    return Array.from(mapa.values()).sort((a, b) => {
+      if (!a.poloId) return 1;
+      if (!b.poloId) return -1;
+      return a.nome.localeCompare(b.nome, "pt-BR");
+    });
+  }, [demais, polos]);
+
+  const contagemPorPolo = useMemo(() => {
+    const base = usuarios.filter((u) => u.status !== "pendente" && passaBusca(u));
+    const map: Record<string, number> = { todos: base.length, __sem__: 0 };
+    for (const p of polos) map[p.id] = 0;
+    for (const u of base) {
+      if (!u.poloId) map.__sem__ += 1;
+      else if (map[u.poloId] !== undefined) map[u.poloId] += 1;
+      else map[u.poloId] = 1;
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarios, termoBusca, polos]);
 
   const aprovar = async (usuario: Usuario) => {
     setSavingId(usuario.id);
@@ -153,6 +225,15 @@ const Usuarios: React.FC = () => {
       return;
     }
 
+    // Liberar Engajamento exige setor já definido (trigger no banco também valida).
+    if (!jaTem && area === "engajamento" && !usuario.setorId) {
+      showToast(
+        "Defina o setor do colaborador antes de liberar a área Engajamento.",
+        "error"
+      );
+      return;
+    }
+
     const novasAreas = jaTem
       ? usuario.areasPermitidas.filter((a) => a !== area)
       : [...usuario.areasPermitidas, area];
@@ -184,10 +265,24 @@ const Usuarios: React.FC = () => {
 
     const poloAnterior = usuario.poloId;
     const poloNome = polos.find((p) => p.id === novoPoloId)?.nome;
+    // Setor de outro polo deixa de valer — limpa local e no banco.
+    const setorFicaInvalido =
+      !!usuario.setorId &&
+      !!novoPoloId &&
+      !setores.some((s) => s.id === usuario.setorId && s.poloId === novoPoloId);
 
     setUsuarios((prev) =>
       prev.map((u) =>
-        u.id === usuario.id ? { ...u, poloId: novoPoloId ?? undefined, poloNome } : u
+        u.id === usuario.id
+          ? {
+              ...u,
+              poloId: novoPoloId ?? undefined,
+              poloNome,
+              ...(setorFicaInvalido || !novoPoloId
+                ? { setorId: undefined, setorNome: undefined }
+                : {}),
+            }
+          : u
       )
     );
     setSavingId(usuario.id);
@@ -198,10 +293,20 @@ const Usuarios: React.FC = () => {
       setUsuarios((prev) =>
         prev.map((u) =>
           u.id === usuario.id
-            ? { ...u, poloId: poloAnterior, poloNome: usuario.poloNome }
+            ? {
+                ...u,
+                poloId: poloAnterior,
+                poloNome: usuario.poloNome,
+                setorId: usuario.setorId,
+                setorNome: usuario.setorNome,
+              }
             : u
         )
       );
+    } else if (setorFicaInvalido || !novoPoloId) {
+      if (usuario.setorId) {
+        await definirSetorUsuario(usuario.id, null);
+      }
     }
     setSavingId(null);
   };
@@ -213,15 +318,78 @@ const Usuarios: React.FC = () => {
     }
 
     const roleAnterior = usuario.role;
-    setUsuarios((prev) => prev.map((u) => (u.id === usuario.id ? { ...u, role: novoRole } : u)));
+    const setorAnterior = usuario.setorId;
+    const setorNomeAnterior = usuario.setorNome;
+    // Admin/supervisor não usam setor (regra do banco limpa no trigger).
+    const limparSetor = novoRole === "admin" || novoRole === "supervisor";
+
+    setUsuarios((prev) =>
+      prev.map((u) =>
+        u.id === usuario.id
+          ? {
+              ...u,
+              role: novoRole,
+              ...(limparSetor ? { setorId: undefined, setorNome: undefined } : {}),
+            }
+          : u
+      )
+    );
     setSavingId(usuario.id);
 
     const { error } = await definirRoleUsuario(usuario.id, novoRole, usuario.poloId ?? null);
     if (error) {
       showToast(error, "error");
-      setUsuarios((prev) => prev.map((u) => (u.id === usuario.id ? { ...u, role: roleAnterior } : u)));
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.id === usuario.id
+            ? { ...u, role: roleAnterior, setorId: setorAnterior, setorNome: setorNomeAnterior }
+            : u
+        )
+      );
     } else {
+      if (limparSetor && setorAnterior) {
+        await definirSetorUsuario(usuario.id, null);
+      }
       showToast(`${usuario.name} agora é ${ROLE_LABELS[novoRole]}`, "success");
+    }
+    setSavingId(null);
+  };
+
+  const alterarSetor = async (usuario: Usuario, setorId: string) => {
+    const novoSetorId = setorId || null;
+    const temEngajamento = usuario.areasPermitidas.includes("engajamento");
+
+    if (!novoSetorId && temEngajamento) {
+      showToast(
+        "Colaborador com área Engajamento precisa de um setor. Remova a área antes de limpar o setor.",
+        "error"
+      );
+      return;
+    }
+
+    const setorAnterior = usuario.setorId;
+    const setorNomeAnterior = usuario.setorNome;
+    const setorNome = setores.find((s) => s.id === novoSetorId)?.nome;
+
+    setUsuarios((prev) =>
+      prev.map((u) =>
+        u.id === usuario.id
+          ? { ...u, setorId: novoSetorId ?? undefined, setorNome }
+          : u
+      )
+    );
+    setSavingId(usuario.id);
+
+    const { error } = await definirSetorUsuario(usuario.id, novoSetorId);
+    if (error) {
+      showToast(error, "error");
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.id === usuario.id
+            ? { ...u, setorId: setorAnterior, setorNome: setorNomeAnterior }
+            : u
+        )
+      );
     }
     setSavingId(null);
   };
@@ -243,6 +411,49 @@ const Usuarios: React.FC = () => {
           <p className="usuarios-subtitle">
             Aprove novos cadastros e defina a quais áreas cada colaborador tem acesso
           </p>
+        </div>
+      </div>
+
+      <div className="usuarios-toolbar">
+        <div className="usuarios-busca">
+          <Search size={16} />
+          <input
+            type="search"
+            placeholder="Buscar por nome ou e-mail..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            aria-label="Buscar usuários"
+          />
+        </div>
+        <div className="usuarios-polo-chips" role="group" aria-label="Filtrar por polo">
+          <button
+            type="button"
+            className={`usuarios-polo-chip${poloFiltro === null ? " active" : ""}`}
+            onClick={() => setPoloFiltro(null)}
+          >
+            Todos
+            <span className="usuarios-polo-chip-count">{contagemPorPolo.todos ?? 0}</span>
+          </button>
+          {polos.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`usuarios-polo-chip${poloFiltro === p.id ? " active" : ""}`}
+              onClick={() => setPoloFiltro(p.id)}
+            >
+              <MapPin size={12} />
+              {p.nome}
+              <span className="usuarios-polo-chip-count">{contagemPorPolo[p.id] ?? 0}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`usuarios-polo-chip${poloFiltro === "__sem__" ? " active" : ""}`}
+            onClick={() => setPoloFiltro("__sem__")}
+          >
+            Sem polo
+            <span className="usuarios-polo-chip-count">{contagemPorPolo.__sem__ ?? 0}</span>
+          </button>
         </div>
       </div>
 
@@ -290,11 +501,28 @@ const Usuarios: React.FC = () => {
       <section className="usuarios-section">
         <h2 className="usuarios-section-title">
           <UserCog size={17} />
-          Todos os usuários
+          Usuários por polo
+          <span className="usuarios-section-count">({demais.length})</span>
         </h2>
 
-        <div className="usuarios-list">
-          {demais.map((usuario) => {
+        {gruposPorPolo.length === 0 ? (
+          <p className="usuarios-vazio">Nenhum usuário encontrado com os filtros atuais.</p>
+        ) : (
+          <div className="usuarios-polos-grid">
+            {gruposPorPolo.map((grupo) => (
+              <div key={grupo.poloId || "__sem__"} className="usuarios-polo-card">
+                <div className="usuarios-polo-card-header">
+                  <div className="usuarios-polo-card-title">
+                    <MapPin size={16} />
+                    <h3>{grupo.nome}</h3>
+                  </div>
+                  <span className="usuarios-polo-card-count">
+                    {grupo.usuarios.length}{" "}
+                    {grupo.usuarios.length === 1 ? "usuário" : "usuários"}
+                  </span>
+                </div>
+                <div className="usuarios-list">
+                  {grupo.usuarios.map((usuario) => {
             const statusInfo = STATUS_INFO[usuario.status];
             const isSelfAdmin = usuario.role === "admin";
 
@@ -396,14 +624,55 @@ const Usuarios: React.FC = () => {
                         ))}
                       </select>
                     </div>
+                    {usuario.role === "colaborador" && (
+                      <div className="usuario-polo">
+                        <label htmlFor={`setor-${usuario.id}`}>
+                          Setor (Engajamento)
+                          {usuario.areasPermitidas.includes("engajamento") && (
+                            <span className="required"> *</span>
+                          )}
+                        </label>
+                        <select
+                          id={`setor-${usuario.id}`}
+                          value={usuario.setorId || ""}
+                          disabled={
+                            savingId === usuario.id || usuario.status !== "aprovado"
+                          }
+                          onChange={(e) => alterarSetor(usuario, e.target.value)}
+                        >
+                          <option value="">Selecione um setor...</option>
+                          {setores
+                            .filter((s) =>
+                              usuario.poloId ? s.poloId === usuario.poloId : true
+                            )
+                            .map((setor) => (
+                              <option key={setor.id} value={setor.id}>
+                                {setor.nome}
+                              </option>
+                            ))}
+                        </select>
+                        {usuario.areasPermitidas.includes("engajamento") &&
+                          !usuario.setorId && (
+                          <p className="usuario-polo-aviso">
+                            Obrigatório para área Engajamento — defina o setor
+                            antes de liberar a área.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <p className="usuario-areas-admin-note">Acesso total (admin)</p>
                 )}
               </div>
             );
-          })}
-        </div>
+
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

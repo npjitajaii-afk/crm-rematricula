@@ -4,7 +4,7 @@ import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
-import { Search, Plus, Sparkles, MoveHorizontal, Upload, Trash2, Filter, Download } from "lucide-react";
+import { Plus, Sparkles, MoveHorizontal, Upload, Trash2, Filter, Download } from "lucide-react";
 import SearchBox from "../components/SearchBox";
 import { AREA_CONFIG } from "../config/areas";
 import { getStatusLabel, getSourceLabel } from "../utils/formatters";
@@ -51,9 +51,9 @@ const Engajamento: React.FC = () => {
     deleteAluno,
     deleteAlunosBulk,
     assumirAluno,
-    isAdmin,
     canGerenciarPolo,
     colaboradores,
+    setores,
   } = useAlunos();
 
   const filteredAlunos = filteredAlunosTodasAreas.filter(
@@ -91,12 +91,17 @@ const Engajamento: React.FC = () => {
   const [selectedColaborador, setSelectedColaborador] = useState<string>(
     filters.assignedTo || ""
   );
+  const [selectedSetor, setSelectedSetor] = useState<string>(
+    filters.setorId || ""
+  );
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   // Ao clicar no card/linha do aluno, expande o painel por cima da tela
   // (ver AlunoExpandModal.tsx) em vez de navegar pra /alunos/:id.
   const [expandedAlunoId, setExpandedAlunoId] = useState<string | null>(null);
   const [delegarAlunoId, setDelegarAlunoId] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
+  /** Setor aplicado na importação; "" = sem setor */
+  const [importSetorId, setImportSetorId] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Debounce: mesma lógica de Alunos.tsx — só reaplica o filtro global
@@ -132,10 +137,20 @@ const Engajamento: React.FC = () => {
     });
   };
 
+  const handleSetorFilter = (setorId: string) => {
+    setSelectedSetor(setorId);
+    setCurrentPage(1);
+    setFilters({
+      ...filters,
+      setorId: setorId || undefined,
+    });
+  };
+
   const handleClearFilters = () => {
     setSearchTerm("");
     setSelectedStatus([]);
     setSelectedColaborador("");
+    setSelectedSetor("");
     setCurrentPage(1);
     setFilters({});
   };
@@ -152,6 +167,7 @@ const Engajamento: React.FC = () => {
         Turno: aluno.turno || "",
         Status: statuses.find((s) => s.value === aluno.status)?.label || aluno.status,
         Canal: sources.find((s) => s.value === aluno.source)?.label || aluno.source,
+        Setor: aluno.setorNome || "",
         Responsável:
           colaboradores.find((c) => c.id === aluno.assignedTo)?.name || "",
         "Valor Pendente": aluno.value || 0,
@@ -246,9 +262,13 @@ const Engajamento: React.FC = () => {
     setImportProgress({ done: 0, total: 0 });
 
     try {
-      const { imported, ignored, duplicados } = await importAlunosEngajamento(file, (done, total) => {
-        setImportProgress({ done, total });
-      });
+      const { imported, ignored, duplicados } = await importAlunosEngajamento(
+        file,
+        (done, total) => {
+          setImportProgress({ done, total });
+        },
+        { setorId: importSetorId || null }
+      );
       showToast(
         `${imported} card(s) criado(s) para o polo de Itajaí` +
           (ignored ? `; ${ignored} registro(s) de outros polos ignorado(s)` : "") +
@@ -279,39 +299,81 @@ const Engajamento: React.FC = () => {
             acompanhamento
           </p>
         </div>
-        <div className="leads-actions">
-          {canGerenciarPolo && selectedIds.length > 0 && (
-            <button className="btn btn-danger" onClick={handleBulkDelete}>
-              <Trash2 size={18} />
-              Excluir selecionados ({selectedIds.length})
-            </button>
-          )}
-          <button className="btn btn-secondary" onClick={handleExport}>
-            <Download size={18} />
-            Exportar
-          </button>
-          <label className={`btn btn-secondary${importProgress ? " btn-disabled" : ""}`}>
-            <Upload size={18} />
-            {importProgress
-              ? importProgress.total > 0
-                ? `Importando ${importProgress.done}/${importProgress.total}...`
-                : "Lendo arquivo..."
-              : "Importar planilha"}
-            <input
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              onChange={handleImport}
-              disabled={!!importProgress}
-              style={{ display: "none" }}
-            />
-          </label>
-          <button
-            className="btn btn-primary"
-            onClick={() => navigate("/engajamento/novo")}
+        <div
+          className="leads-actions"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: "0.4rem",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: "0.5rem",
+            }}
           >
-            <Plus size={18} />
-            Novo Aluno
-          </button>
+            {canGerenciarPolo && selectedIds.length > 0 && (
+              <button className="btn btn-danger" onClick={handleBulkDelete}>
+                <Trash2 size={18} />
+                Excluir selecionados ({selectedIds.length})
+              </button>
+            )}
+            <button className="btn btn-secondary" onClick={handleExport}>
+              <Download size={18} />
+              Exportar
+            </button>
+            <label className={`btn btn-secondary${importProgress ? " btn-disabled" : ""}`}>
+              <Upload size={18} />
+              {importProgress
+                ? importProgress.total > 0
+                  ? `Importando ${importProgress.done}/${importProgress.total}...`
+                  : "Lendo arquivo..."
+                : "Importar planilha"}
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleImport}
+                disabled={!!importProgress}
+                style={{ display: "none" }}
+              />
+            </label>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate("/engajamento/novo")}
+            >
+              <Plus size={18} />
+              Novo Aluno
+            </button>
+          </div>
+          {canGerenciarPolo && (
+            <select
+              className="filter-select"
+              style={{ maxWidth: 200 }}
+              value={importSetorId}
+              onChange={(e) => setImportSetorId(e.target.value)}
+              disabled={!!importProgress}
+              title="Setor dos contatos importados"
+              aria-label="Setor da importação"
+            >
+              <option value="">Importar sem setor</option>
+              {(setores || [])
+                .filter((s) => {
+                  if (s.nome === "Geral") return false;
+                  if (user?.poloId) return s.poloId === user.poloId;
+                  return true;
+                })
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nome}
+                  </option>
+                ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -327,9 +389,13 @@ const Engajamento: React.FC = () => {
         >
           <Filter size={18} />
           Filtros
-          {(selectedStatus.length > 0 || selectedColaborador) && (
+          {(selectedStatus.length > 0 ||
+            selectedColaborador ||
+            selectedSetor) && (
             <span className="filter-badge">
-              {selectedStatus.length + (selectedColaborador ? 1 : 0)}
+              {selectedStatus.length +
+                (selectedColaborador ? 1 : 0) +
+                (selectedSetor ? 1 : 0)}
             </span>
           )}
         </button>
@@ -365,8 +431,33 @@ const Engajamento: React.FC = () => {
               {colaboradores.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                  {c.setorNome ? ` · ${c.setorNome}` : ""}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label>Setor:</label>
+            <select
+              className="filter-select"
+              value={selectedSetor}
+              onChange={(e) => handleSetorFilter(e.target.value)}
+            >
+              <option value="">Todos os setores</option>
+              {setores
+                .filter((s) => {
+                  // Sempre filtra pelo polo do usuário logado.
+                  // Assim o admin também vê só os 3 setores do próprio polo
+                  // (Comercial, Contato, Jornada) e não a lista repetida de todos os polos.
+                  if (user?.poloId) return s.poloId === user.poloId;
+                  return true;
+                })
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nome}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -466,7 +557,7 @@ const Engajamento: React.FC = () => {
               >
                 Anterior
               </button>
-              <span>
+                            <span>
                 Página {currentPage} de {totalPages} ({filteredAlunos.length}{" "}
                 contatos)
               </span>

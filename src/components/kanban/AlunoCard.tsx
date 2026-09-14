@@ -174,6 +174,12 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
         )}
       </div>
 
+      {aluno.setorNome && (
+        <span className="lead-setor-badge" title="Setor">
+          {aluno.setorNome}
+        </span>
+      )}
+
       {aluno.matriculaVinculadaId && (
         <div
           className="lead-matriculas-tabs"

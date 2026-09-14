@@ -15,10 +15,14 @@ function mapProfileToUser(profile: {
   status?: string;
   areas_permitidas?: string[] | null;
   polo_id?: string | null;
+  setor_id?: string | null;
   polos?: { nome: string } | { nome: string }[] | null;
+  setores?: { nome: string } | { nome: string }[] | null;
 }): User {
   const poloJoin = profile.polos;
   const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;
+  const setorJoin = profile.setores;
+  const setorNome = Array.isArray(setorJoin) ? setorJoin[0]?.nome : setorJoin?.nome;
 
   return {
     id: profile.id,
@@ -30,6 +34,8 @@ function mapProfileToUser(profile: {
     areasPermitidas: (profile.areas_permitidas ?? []) as User["areasPermitidas"],
     poloId: profile.polo_id ?? undefined,
     poloNome,
+    setorId: profile.setor_id ?? undefined,
+    setorNome,
   };
 }
 
@@ -39,7 +45,7 @@ function mapProfileToUser(profile: {
 async function fetchProfile(userId: string): Promise<AuthResponse> {
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('*, polos(nome)')
+    .select('*, polos(nome), setores(nome)')
     .eq('id', userId)
     .single();
 

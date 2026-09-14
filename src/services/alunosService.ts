@@ -14,13 +14,15 @@ export interface AlunosResponse {
 /** Lista/kanban: sem histórico de interações (payload leve). */
 const SELECT_LISTA = `
   *,
-  polos ( nome )
+  polos ( nome ),
+  setores ( nome )
 `;
 
 /** Detalhe/modal: inclui interações + autor. */
 const SELECT_WITH_INTERACOES = `
   *,
   polos ( nome ),
+  setores ( nome ),
   interacoes (
     id,
     tipo,
@@ -66,6 +68,8 @@ function sanitizarCampo(valor: string, limite: number, pegarPrimeiro = false): s
 function mapDatabaseToAluno(data: any): Aluno {
   const poloJoin = data.polos;
   const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;
+  const setorJoin = data.setores;
+  const setorNome = Array.isArray(setorJoin) ? setorJoin[0]?.nome : setorJoin?.nome;
 
   return {
     id: data.id,
@@ -85,13 +89,16 @@ function mapDatabaseToAluno(data: any): Aluno {
     matriculaVinculadaId: data.matricula_vinculada_id || undefined,
     poloId: data.polo_id,
     poloNome,
+    setorId: data.setor_id || undefined,
+    setorNome,
     createdBy: data.criado_por,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
-statusAtualizadoEm: data.status_atualizado_em
+    statusAtualizadoEm: data.status_atualizado_em
       ? new Date(data.status_atualizado_em)
       : new Date(data.updated_at),
-    interactions: (data.interacoes || []).map(      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    interactions: (data.interacoes || []).map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (i: any) => ({
         id: i.id,
         alunoId: data.id,
@@ -224,6 +231,37 @@ export async function getAlunoById(id: string): Promise<AlunoResponse> {
 }
 
 /**
+ * Busca contatos por nome/e-mail/telefone/RA, em qualquer área — usado
+ * na tela de Transferências (admin/supervisor movem setor/responsável
+ * sem precisar abrir o funil certo primeiro). RLS de `alunos` já garante
+ * que só volta o que admin/supervisor podem ver (polo inteiro).
+ */
+export async function buscarAlunosPolo(termo: string): Promise<AlunosResponse> {
+  const busca = termo.trim();
+  if (!busca) return { alunos: [], error: null };
+
+  try {
+    const { data, error } = await supabase
+      .from('alunos')
+      .select(SELECT_LISTA)
+      .or(
+        `nome.ilike.%${busca}%,email.ilike.%${busca}%,telefone.ilike.%${busca}%,ra.ilike.%${busca}%`
+      )
+      .order('nome', { ascending: true })
+      .limit(20);
+
+    if (error) {
+      console.error('Error searching alunos:', error);
+      return { alunos: [], error: error.message };
+    }
+
+    return { alunos: ((data || []) as unknown[]).map(mapDatabaseToAluno), error: null };
+  } catch {
+    return { alunos: [], error: 'Erro ao buscar contatos' };
+  }
+}
+
+/**
  * Normalização usada tanto aqui quanto no banco (ver migration
  * 016_bloqueio_duplicados.sql, mesma lógica) pra checar duplicados antes
  * de gravar. Mantém as duas em sincronia caso uma delas mude.
@@ -234,8 +272,21 @@ function normalizarNome(nome: string): string {
 function normalizarTelefone(telefone: string): string {
   return (telefone || '').replace(/\D/g, '');
 }
-function normalizarRa(ra: string): string {
-  return ra.trim().toUpperCase();
+/**
+ * RA normalizado: só dígitos, exatamente 10 posições (preenche com zero à esquerda).
+ * Ex.: "12.345-6" → "0000012345" | "1234567890" → "1234567890"
+ * Usado no bloqueio de duplicidade e deve bater com a coluna/generated do banco.
+ */
+export function normalizarRa(ra: string): string {
+  const digitos = (ra || '').replace(/\D/g, '');
+  if (!digitos) return '';
+  // Mantém no máximo 10 dígitos (os da direita) e completa à esquerda com 0.
+  return digitos.slice(-10).padStart(10, '0');
+}
+
+/** Exportado para o formulário comparar nomes da mesma forma. */
+export function normalizarNomeAluno(nome: string): string {
+  return normalizarNome(nome);
 }
 
 const AREA_LABEL: Record<string, string> = {
@@ -248,11 +299,16 @@ export interface AlunoDuplicado {
   id: string;
   nome: string;
   area: string;
-  motivo: 'ra' | 'nome_telefone';
+  motivo: 'ra' | 'nome' | 'nome_telefone';
 }
 
 function mensagemDuplicado(d: AlunoDuplicado): string {
-  const motivoLabel = d.motivo === 'ra' ? 'o mesmo RA' : 'o mesmo nome e telefone';
+  const motivoLabel =
+    d.motivo === 'ra'
+      ? 'o mesmo RA (10 dígitos)'
+      : d.motivo === 'nome'
+      ? 'o mesmo nome'
+      : 'o mesmo nome e telefone';
   return `Já existe um contato com ${motivoLabel}: "${d.nome}" (funil: ${
     AREA_LABEL[d.area] || d.area
   }). Cadastro bloqueado para evitar duplicidade.`;
@@ -325,6 +381,7 @@ export async function createAluno(
           responsavel_id: aluno.assignedTo || null,
           criado_por: aluno.createdBy,
           ...(aluno.poloId ? { polo_id: aluno.poloId } : {}),
+          ...(aluno.setorId ? { setor_id: aluno.setorId } : {}),
         },
       ])
       .select(SELECT_WITH_INTERACOES)
@@ -455,6 +512,7 @@ export async function createAlunosBulk(
     responsavel_id: aluno.assignedTo || null,
     criado_por: aluno.createdBy,
     ...(aluno.poloId ? { polo_id: aluno.poloId } : {}),
+    ...(aluno.setorId ? { setor_id: aluno.setorId } : {}),
   }));
 
   const batches: (typeof rows)[] = [];
@@ -552,6 +610,7 @@ export async function updateAluno(
     if (updates.tags !== undefined) updateData.tags = updates.tags || [];
     if (updates.assignedTo !== undefined) updateData.responsavel_id = updates.assignedTo || null;
     if (updates.poloId !== undefined) updateData.polo_id = updates.poloId;
+    if (updates.setorId !== undefined) updateData.setor_id = updates.setorId || null;
 
     const { data, error } = await supabase
       .from('alunos')
@@ -724,7 +783,15 @@ export async function getPipelineResumo(): Promise<{ resumo: PipelineStatusResum
  * Lista colaboradores (id/nome/email) pra tela de delegação do admin.
  */
 export async function getColaboradores(): Promise<{
-  colaboradores: { id: string; name: string; email: string; poloId?: string; poloNome?: string }[];
+  colaboradores: {
+    id: string;
+    name: string;
+    email: string;
+    poloId?: string;
+    poloNome?: string;
+    setorId?: string;
+    setorNome?: string;
+  }[];
   error: string | null;
 }> {
   try {
@@ -733,6 +800,8 @@ export async function getColaboradores(): Promise<{
     // vir só do próprio polo — por isso usa a RPC em vez de ler a tabela
     // direto. (A tela de Usuários, admin-only, continua lendo a tabela
     // profiles direto e enxergando todo mundo, de propósito.)
+    // A RPC colaboradores_polo() já retorna setor_id / setor_nome (SQL
+    // complementar de setores).
     const { data, error } = await supabase.rpc('colaboradores_polo');
 
     if (error) {
@@ -741,13 +810,25 @@ export async function getColaboradores(): Promise<{
     }
 
     return {
-      colaboradores: (data || []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        email: row.email,
-        poloId: row.polo_id ?? undefined,
-        poloNome: row.polo_nome ?? undefined,
-      })),
+      colaboradores: (data || []).map(
+        (row: {
+          id: string;
+          name: string;
+          email: string;
+          polo_id?: string | null;
+          polo_nome?: string | null;
+          setor_id?: string | null;
+          setor_nome?: string | null;
+        }) => ({
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          poloId: row.polo_id ?? undefined,
+          poloNome: row.polo_nome ?? undefined,
+          setorId: row.setor_id ?? undefined,
+          setorNome: row.setor_nome ?? undefined,
+        })
+      ),
       error: null,
     };
   } catch {
@@ -866,6 +947,10 @@ export async function criarMatriculaVinculada(
         responsavel_id: origem.assignedTo || null,
         criado_por: dados.createdBy,
         matricula_vinculada_id: origemId,
+        ...(origem.poloId ? { polo_id: origem.poloId } : {}),
+        ...(dados.area === 'engajamento' && origem.setorId
+          ? { setor_id: origem.setorId }
+          : {}),
       }])
       .select(SELECT_WITH_INTERACOES)
       .single();

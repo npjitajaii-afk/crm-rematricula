@@ -203,6 +203,11 @@ const AlunoSwipeRow: React.FC<AlunoSwipeRowProps> = ({
             <div className="aluno-row-main">
               <strong className="aluno-row-name">{aluno.name}</strong>
               {aluno.ra && <span className="aluno-row-ra">RA: {aluno.ra}</span>}
+              {aluno.setorNome && (
+                <span className="aluno-row-setor" title="Setor">
+                  {aluno.setorNome}
+                </span>
+              )}
               {aluno.matriculaVinculadaId && (
                 <span
                   className="aluno-row-vinculo-badge"

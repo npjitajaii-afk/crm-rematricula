@@ -323,7 +323,7 @@ const AreaDashboard: React.FC<AreaDashboardProps> = ({ area }) => {
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
                 <YAxis type="category" dataKey="label" width={140} tick={{ fontSize: 12 }} />
                 <Tooltip
-                  formatter={(value: number) => [value, "Alunos"]}
+                  formatter={(value) => [Number(value), "Alunos"]}
                   contentStyle={{ fontSize: 13, borderRadius: 8 }}
                 />
                 <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={18}>
@@ -467,7 +467,7 @@ const MetricasCruzadas: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--gray-200)" />
               <XAxis dataKey="canal" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
-              <Tooltip formatter={(value: number) => [`${value}%`, "Taxa de conversão"]} contentStyle={{ fontSize: 13, borderRadius: 8 }} />
+              <Tooltip formatter={(value) => [`${Number(value)}%`, "Taxa de conversão"]} contentStyle={{ fontSize: 13, borderRadius: 8 }} />
               <Legend
                 formatter={(value) => AREA_CONFIG[value as Area]?.label ?? value}
                 wrapperStyle={{ fontSize: 12 }}

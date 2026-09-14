@@ -26,6 +26,7 @@ const RiscoEvasao         = lazy(() => import("./pages/RiscoEvasao"));
 const MetricasDashboard   = lazy(() => import("./pages/MetricasDashboard"));
 const Grupos              = lazy(() => import("./pages/Grupos"));
 const Colaboradores       = lazy(() => import("./pages/Colaboradores"));
+const Transferencias      = lazy(() => import("./pages/Transferencias"));
 const Polos               = lazy(() => import("./pages/Polos"));
 const Usuarios            = lazy(() => import("./pages/Usuarios"));
 const Retencao            = lazy(() => import("./pages/Retencao"));
@@ -109,6 +110,7 @@ function App() {
                       <Route path="metricas" element={<GestorRoute><MetricasDashboard /></GestorRoute>} />
                       <Route path="grupos" element={<GestorRoute><Grupos /></GestorRoute>} />
                       <Route path="colaboradores" element={<GestorRoute><Colaboradores /></GestorRoute>} />
+                      <Route path="transferencias" element={<GestorRoute><Transferencias /></GestorRoute>} />
                       <Route path="polos" element={<AdminRoute><Polos /></AdminRoute>} />
                       <Route path="usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
 

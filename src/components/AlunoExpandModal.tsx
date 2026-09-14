@@ -17,19 +17,27 @@ import {
   Link2,
   Calendar,
   Clock3,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useChecklist } from "../hooks/useChecklist";
 import { useToast } from "../hooks/useToast";
-import { AlunoStatus, TarefaPessoal, AgendaCompromisso } from "../types";
+import { AlunoStatus, TarefaPessoal, AgendaCompromisso, SolicitacaoTransferencia } from "../types";
 import { getAlunoById } from "../services/alunosService";
 import { getTarefasPorAluno, TarefasArea } from "../services/tarefasEngajamentoService";
 import { getCompromissosPorAluno, criarCompromissoAgenda, AgendaArea } from "../services/agendaEngajamentoService";
+import {
+  solicitacoesDoAluno,
+  criarSolicitacaoTransferencia,
+  autorizarSolicitacaoTransferencia,
+  cancelarSolicitacaoTransferencia,
+} from "../services/transferenciasService";
 import { AREA_CONFIG } from "../config/areas";
 import { TAGS_SELECIONAVEIS_POR_AREA, TAGS_DISPONIVEIS } from "../utils/tags";
 import { getStatusColor, getStatusLabel } from "../utils/formatters";
 import NovaMatriculaModal from "./NovaMatriculaModal";
+import DelegarContatoModal from "./DelegarContatoModal";
 import TarefaModal from "./TarefaModal";
 import "../pages/AlunoDetails.css";
 import "../pages/AlunoForm.css";
@@ -66,8 +74,10 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   onClose,
   onOpenVinculada,
 }) => {
-  const { getAluno, updateAluno, colaboradores, isAdmin, canGerenciarPolo } = useAlunos();
+  const { getAluno, updateAluno, assumirAluno, colaboradores, isAdmin, canGerenciarPolo, setores } = useAlunos();
   const [criandoVinculada, setCriandoVinculada] = useState(false);
+  const [mostrarDelegar, setMostrarDelegar] = useState(false);
+  const [assumindo, setAssumindo] = useState(false);
   const {
     itensPorAluno,
     toggleItem,
@@ -89,9 +99,18 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   const [salvandoObs, setSalvandoObs] = useState(false);
   // Anotações | Tarefas | Agenda — só uma fica visível por vez.
   // Tarefas e Agenda respeitam vínculo ao aluno + isolamento por funil/polo.
-  const [abaMeio, setAbaMeio] = useState<"anotacoes" | "tarefas" | "agenda">(
+  const [abaMeio, setAbaMeio] = useState<"anotacoes" | "tarefas" | "agenda" | "transferencia">(
     "anotacoes"
   );
+
+  // Solicitações de transferência abertas deste aluno
+  const [solsTransferencia, setSolsTransferencia] = useState<SolicitacaoTransferencia[]>([]);
+  const [carregandoSols, setCarregandoSols] = useState(false);
+  const [setorDestinoSol, setSetorDestinoSol] = useState("");
+  const [colabDestinoSol, setColabDestinoSol] = useState("");
+  const [motivoSol, setMotivoSol] = useState("");
+  const [enviandoSol, setEnviandoSol] = useState(false);
+  const [acaoSolId, setAcaoSolId] = useState<string | null>(null);
 
   // Tarefas pessoais vinculadas a este aluno (aparecem só se o colaborador vinculou)
   const [tarefasVinculadas, setTarefasVinculadas] = useState<TarefaPessoal[]>([]);
@@ -226,12 +245,141 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   }, [aluno?.area, aluno?.id, garantirItensCarregados]);
 
   // Carrega tarefas e agenda vinculadas quando o aluno está disponível.
+
+  const carregarSolsTransferencia = useCallback(async () => {
+    if (!aluno?.id) return;
+    setCarregandoSols(true);
+    try {
+      const { solicitacoes, error } = await solicitacoesDoAluno(aluno.id);
+      if (!error) setSolsTransferencia(solicitacoes);
+    } finally {
+      setCarregandoSols(false);
+    }
+  }, [aluno?.id]);
+
   useEffect(() => {
     if (aluno?.id) {
       carregarTarefasVinculadas();
       carregarAgendaVinculada();
     }
   }, [aluno?.id, carregarTarefasVinculadas, carregarAgendaVinculada]);
+
+  useEffect(() => {
+    if (!aluno?.id) return;
+    carregarSolsTransferencia();
+  }, [aluno?.id, carregarSolsTransferencia]);
+
+
+  const isDonoContato = !!aluno && !!user && aluno.assignedTo === user.id;
+  const temResponsavelOutro =
+    !!aluno && !!user && !!aluno.assignedTo && aluno.assignedTo !== user.id;
+  const setoresDoPolo = (setores || []).filter((s) =>
+    user?.poloId ? s.poloId === user.poloId : true
+  );
+  const resolverSetorIdDoColab = (colab?: {
+    setorId?: string;
+    setorNome?: string;
+  } | null): string => {
+    if (!colab) return "";
+    if (colab.setorId) return colab.setorId;
+    // Fallback: RPC às vezes manda só o nome do setor
+    if (colab.setorNome) {
+      const byName = (setores || []).find(
+        (s) =>
+          s.nome === colab.setorNome &&
+          (!user?.poloId || s.poloId === user.poloId)
+      );
+      if (byName) return byName.id;
+    }
+    return "";
+  };
+
+  const colabsDoSetorDestino = (colaboradores || []).filter((c) => {
+    if (!setorDestinoSol) return true;
+    const sid = resolverSetorIdDoColab(c);
+    // Mantém o já selecionado na lista mesmo se o setor divergir temporariamente
+    if (c.id === colabDestinoSol) return true;
+    return sid === setorDestinoSol;
+  });
+
+  const handleCriarSolicitacao = async () => {
+    // Pedido para assumir contato de outro: setor = setor do solicitante (automático)
+    const setorDestino =
+      temResponsavelOutro
+        ? user?.setorId ||
+          (setores || []).find(
+            (s) =>
+              s.nome === user?.setorNome &&
+              (!user?.poloId || s.poloId === user.poloId)
+          )?.id ||
+          ""
+        : setorDestinoSol;
+
+    if (!aluno || !setorDestino) {
+      showToast(
+        temResponsavelOutro
+          ? "Seu usuário precisa ter um setor cadastrado para solicitar o contato."
+          : "Selecione o setor de destino.",
+        "error"
+      );
+      return;
+    }
+    setEnviandoSol(true);
+    try {
+      const { error } = await criarSolicitacaoTransferencia({
+        alunoId: aluno.id,
+        setorDestinoId: setorDestino,
+        colaboradorDestinoId: temResponsavelOutro
+          ? user?.id
+          : colabDestinoSol || null,
+        motivo: temResponsavelOutro ? undefined : motivoSol.trim() || undefined,
+      });
+      if (error) {
+        showToast(error, "error");
+      } else {
+        showToast("Solicitação de transferência enviada.", "success");
+        setMotivoSol("");
+        setSetorDestinoSol("");
+        setColabDestinoSol("");
+        await carregarSolsTransferencia();
+      }
+    } finally {
+      setEnviandoSol(false);
+    }
+  };
+
+  const handleAutorizarSol = async (solId: string, aprovar: boolean) => {
+    setAcaoSolId(solId);
+    try {
+      const { error } = await autorizarSolicitacaoTransferencia(solId, aprovar);
+      if (error) showToast(error, "error");
+      else {
+        showToast(
+          aprovar
+            ? "Autorizado. Aguardando supervisor/admin."
+            : "Solicitação recusada.",
+          aprovar ? "success" : "info"
+        );
+        await carregarSolsTransferencia();
+      }
+    } finally {
+      setAcaoSolId(null);
+    }
+  };
+
+  const handleCancelarSol = async (solId: string) => {
+    setAcaoSolId(solId);
+    try {
+      const { error } = await cancelarSolicitacaoTransferencia(solId);
+      if (error) showToast(error, "error");
+      else {
+        showToast("Solicitação cancelada.", "success");
+        await carregarSolsTransferencia();
+      }
+    } finally {
+      setAcaoSolId(null);
+    }
+  };
 
   if (!aluno) {
     // Ainda buscando a matrícula vinculada (ou ela não existe mais) — sem
@@ -275,7 +423,7 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   const config = AREA_CONFIG[aluno.area];
   const tagsSelecionaveis =
     aluno.area === "rematricula" || aluno.area === "engajamento"
-      ? TAGS_SELECIONAVEIS_POR_AREA[aluno.area]
+      ? TAGS_SELECIONAVEIS_POR_AREA[aluno.area] ?? []
       : TAGS_DISPONIVEIS;
 
   const itensChecklist =
@@ -284,6 +432,23 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
 
   const isOwner = aluno.assignedTo === user?.id;
   const podeEditarCard = canGerenciarPolo || isOwner;
+  // Colaborador pode assumir contatos sem dono; admin/supervisor delegam
+  // diretamente (mesma regra usada em Alunos.tsx e Engajamento.tsx).
+  const podeAssumir = !canGerenciarPolo && !aluno.assignedTo;
+  const podeDelegar = canGerenciarPolo;
+
+  const handleAssumir = async () => {
+    setAssumindo(true);
+    try {
+      await assumirAluno(aluno.id);
+      showToast("Contato assumido com sucesso.", "success");
+      refreshAluno();
+    } catch {
+      showToast("Erro ao assumir contato. Tente novamente.", "error");
+    } finally {
+      setAssumindo(false);
+    }
+  };
 
   const handleStatusChange = async (status: AlunoStatus) => {
     if (!podeEditarCard) {
@@ -484,6 +649,31 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
                         Somente leitura — este contato é de outro colaborador.
                       </span>
                     )}
+                    {(podeAssumir || podeDelegar) && (
+                      <span style={{ display: "block", marginTop: 8 }}>
+                        {podeAssumir && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: "0.35rem 0.7rem", fontSize: "0.82rem" }}
+                            disabled={assumindo}
+                            onClick={handleAssumir}
+                          >
+                            {assumindo ? "Assumindo..." : "Assumir contato"}
+                          </button>
+                        )}
+                        {podeDelegar && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ padding: "0.35rem 0.7rem", fontSize: "0.82rem" }}
+                            onClick={() => setMostrarDelegar(true)}
+                          >
+                            {aluno.assignedTo ? "Reatribuir contato" : "Delegar contato"}
+                          </button>
+                        )}
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -540,6 +730,23 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
                   </span>
                 )}
               </button>
+              {aluno.area === "engajamento" && (
+                <button
+                  type="button"
+                  className={`aluno-expand-tab${
+                    abaMeio === "transferencia" ? " active" : ""
+                  }`}
+                  onClick={() => setAbaMeio("transferencia")}
+                >
+                  <ArrowLeftRight size={14} />
+                  Transferência
+                  {solsTransferencia.length > 0 && (
+                    <span className="aluno-expand-tab-badge">
+                      {solsTransferencia.length}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="aluno-expand-tab-panel">
@@ -736,7 +943,7 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
                     </button>
                   )}
                 </div>
-              ) : (
+              ) : abaMeio === "agenda" ? (
                 /* ===== Aba Agenda ===== */
                 <div className="card aluno-expand-tarefas">
                   {carregandoAgenda ? (
@@ -860,6 +1067,226 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
                     )
                   )}
                 </div>
+              ) : (
+                /* ===== Aba Transferência ===== */
+                <div className="card aluno-expand-tarefas">
+                  {carregandoSols ? (
+                    <p className="checklist-vazio">Carregando solicitações…</p>
+                  ) : solsTransferencia.length > 0 ? (
+                    <ul className="checklist-detalhe-itens" style={{ marginBottom: "1rem" }}>
+                      {solsTransferencia.map((sol) => (
+                        <li key={sol.id} style={{ marginBottom: 12 }}>
+                          <div className="checklist-detalhe-item" style={{ cursor: "default", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+                            <div>
+                              <strong style={{ fontSize: "0.85rem" }}>
+                                {sol.tipo === "assumir_responsabilidade"
+                                  ? "Pedido para assumir contato"
+                                  : "Pedido de mudança de setor"}
+                              </strong>
+                              <span style={{ display: "block", fontSize: "0.75rem", color: "#6b7280" }}>
+                                {sol.solicitanteNome ? `Por ${sol.solicitanteNome}` : ""}
+                                {sol.setorOrigemNome ? ` · ${sol.setorOrigemNome}` : " · sem setor"}
+                                {" → "}
+                                {sol.setorDestinoNome || "?"}
+                                {sol.colaboradorDestinoNome
+                                  ? ` · ${sol.colaboradorDestinoNome}`
+                                  : " · sem colaborador"}
+                              </span>
+                              <span style={{ display: "block", fontSize: "0.75rem", color: "#6b7280" }}>
+                                Status:{" "}
+                                {sol.status === "aguardando_responsavel"
+                                  ? "Aguardando responsável atual"
+                                  : sol.status === "aguardando_gestor"
+                                  ? "Aguardando supervisor/admin"
+                                  : sol.status}
+                              </span>
+                              {sol.motivo && (
+                                <span style={{ display: "block", fontSize: "0.75rem" }}>
+                                  Motivo: {sol.motivo}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              {sol.status === "aguardando_responsavel" &&
+                                user?.id === sol.responsavelOrigemId && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary btn-sm"
+                                      disabled={acaoSolId === sol.id}
+                                      onClick={() => handleAutorizarSol(sol.id, true)}
+                                    >
+                                      Autorizar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm"
+                                      disabled={acaoSolId === sol.id}
+                                      onClick={() => handleAutorizarSol(sol.id, false)}
+                                    >
+                                      Recusar
+                                    </button>
+                                  </>
+                                )}
+                              {(sol.solicitanteId === user?.id || canGerenciarPolo) &&
+                                (sol.status === "aguardando_responsavel" ||
+                                  sol.status === "aguardando_gestor") && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    disabled={acaoSolId === sol.id}
+                                    onClick={() => handleCancelarSol(sol.id)}
+                                  >
+                                    Cancelar pedido
+                                  </button>
+                                )}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="checklist-vazio">
+                      Nenhuma solicitação de transferência em andamento.
+                    </p>
+                  )}
+
+                  {/* Formulário de novo pedido — só se não houver pendente */}
+                  {solsTransferencia.length === 0 && aluno.area === "engajamento" && (
+                    <div style={{ marginTop: "0.5rem" }}>
+                      {temResponsavelOutro ? (
+                        /* Colaborador de outro setor: só solicitar o contato */
+                        <>
+                          <h4 style={{ margin: "0 0 0.5rem", fontSize: "0.9rem" }}>
+                            Solicitar este contato
+                          </h4>
+                          <p style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 12 }}>
+                            O responsável atual precisa autorizar; depois o
+                            supervisor/admin aprova. O contato vai para o seu setor.
+                          </p>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            disabled={enviandoSol}
+                            onClick={handleCriarSolicitacao}
+                          >
+                            {enviandoSol ? "Enviando…" : "Solicitar contato"}
+                          </button>
+                        </>
+                      ) : (
+                        /* Dono do contato: mudança de setor (+ colab opcional) */
+                        <>
+                          <h4 style={{ margin: "0 0 0.5rem", fontSize: "0.9rem" }}>
+                            {isDonoContato
+                              ? "Solicitar mudança de setor"
+                              : "Solicitar transferência"}
+                          </h4>
+                          <p style={{ fontSize: "0.75rem", color: "#6b7280", marginBottom: 8 }}>
+                            O pedido será enviado ao supervisor/admin para aprovação.
+                          </p>
+                          <label style={{ display: "block", fontSize: "0.8rem", marginBottom: 4 }}>
+                            Setor de destino *
+                            <select
+                              className="filter-select"
+                              style={{ display: "block", width: "100%", marginTop: 4 }}
+                              value={setorDestinoSol}
+                              onChange={(e) => {
+                                const novoSetor = e.target.value;
+                                setSetorDestinoSol(novoSetor);
+                                if (colabDestinoSol) {
+                                  const colab = (colaboradores || []).find(
+                                    (c) => c.id === colabDestinoSol
+                                  );
+                                  const sid = resolverSetorIdDoColab(colab);
+                                  if (sid && sid !== novoSetor) {
+                                    setColabDestinoSol("");
+                                  }
+                                }
+                              }}
+                            >
+                              <option value="">Selecione…</option>
+                              {setoresDoPolo.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.nome}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {isDonoContato && (
+                            <label style={{ display: "block", fontSize: "0.8rem", marginBottom: 4, marginTop: 8 }}>
+                              Colaborador destino (opcional)
+                              <select
+                                className="filter-select"
+                                style={{ display: "block", width: "100%", marginTop: 4 }}
+                                value={colabDestinoSol}
+                                onChange={(e) => {
+                                  const colabId = e.target.value;
+                                  const colab = (colaboradores || []).find((c) => c.id === colabId);
+                                  setColabDestinoSol(colabId);
+                                  const setorId = resolverSetorIdDoColab(colab);
+                                  if (setorId) {
+                                    setSetorDestinoSol(setorId);
+                                  }
+                                }}
+                              >
+                                <option value="">Sem responsável</option>
+                                {colabsDoSetorDestino.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                    {c.setorNome ? ` · ${c.setorNome}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                              {colabDestinoSol &&
+                                (() => {
+                                  const colab = (colaboradores || []).find(
+                                    (c) => c.id === colabDestinoSol
+                                  );
+                                  const sid = resolverSetorIdDoColab(colab);
+                                  if (sid && sid === setorDestinoSol) {
+                                    return (
+                                      <span
+                                        style={{
+                                          display: "block",
+                                          fontSize: "0.75rem",
+                                          color: "#6b7280",
+                                          marginTop: 4,
+                                        }}
+                                      >
+                                        Setor preenchido pelo colaborador
+                                        {colab?.setorNome ? ` (${colab.setorNome})` : ""}.
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                            </label>
+                          )}
+                          <label style={{ display: "block", fontSize: "0.8rem", marginTop: 8 }}>
+                            Motivo (opcional)
+                            <textarea
+                              className="aluno-expand-textarea"
+                              style={{ marginTop: 4 }}
+                              rows={2}
+                              value={motivoSol}
+                              onChange={(e) => setMotivoSol(e.target.value)}
+                              placeholder="Por que deseja transferir este contato?"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            style={{ marginTop: 8 }}
+                            disabled={!setorDestinoSol || enviandoSol}
+                            onClick={handleCriarSolicitacao}
+                          >
+                            {enviandoSol ? "Enviando…" : "Enviar solicitação"}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -918,6 +1345,15 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
       </div>
       {criandoVinculada && (
         <NovaMatriculaModal aluno={aluno} onClose={() => setCriandoVinculada(false)} />
+      )}
+      {mostrarDelegar && (
+        <DelegarContatoModal
+          aluno={aluno}
+          onClose={() => {
+            setMostrarDelegar(false);
+            refreshAluno();
+          }}
+        />
       )}
       {modalTarefaAberto && aluno && (
         <TarefaModal

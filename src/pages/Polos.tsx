@@ -1,25 +1,87 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { createPolo, updatePolo, deletePolo } from "../services/polosService";
-import { MapPin, Plus, Loader2, Pencil, Trash2, Check, X } from "lucide-react";
+import {
+  getSetoresDoPolo,
+  createSetor,
+  updateSetor,
+  deleteSetor,
+} from "../services/setoresService";
+import { Setor } from "../types";
+import {
+  MapPin,
+  Plus,
+  Loader2,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+  Layers,
+} from "lucide-react";
 import "./Polos.css";
+
+type AbaPolos = "polos" | "setores";
+
+/** Polo de Itajaí (setores do Engajamento ficam só nele). */
+function encontrarPoloItajai(
+  polos: { id: string; nome: string }[]
+): { id: string; nome: string } | null {
+  const found = polos.find((p) => {
+    const n = p.nome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    return n.includes("itajai");
+  });
+  return found || null;
+}
 
 const Polos: React.FC = () => {
   const { polos, isLoadingAlunos } = useAlunos();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
 
+  const [aba, setAba] = useState<AbaPolos>("polos");
   const [lista, setLista] = useState(polos);
   const [novoNome, setNovoNome] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // ---- Setores (Itajaí) ----
+  const poloItajai = useMemo(() => encontrarPoloItajai(lista), [lista]);
+  const [setoresItajai, setSetoresItajai] = useState<Setor[]>([]);
+  const [carregandoSetores, setCarregandoSetores] = useState(false);
+  const [novoSetorNome, setNovoSetorNome] = useState("");
+  const [editandoSetorId, setEditandoSetorId] = useState<string | null>(null);
+  const [editSetorNome, setEditSetorNome] = useState("");
+
   useEffect(() => {
     setLista(polos);
   }, [polos]);
+
+  const carregarSetores = useCallback(async () => {
+    if (!poloItajai) {
+      setSetoresItajai([]);
+      return;
+    }
+    setCarregandoSetores(true);
+    const { setores, error } = await getSetoresDoPolo(poloItajai.id);
+    setCarregandoSetores(false);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    setSetoresItajai(setores.filter((s) => s.nome !== "Geral"));
+  }, [poloItajai, showToast]);
+
+  useEffect(() => {
+    if (aba === "setores") {
+      carregarSetores();
+    }
+  }, [aba, carregarSetores]);
 
   const criar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +97,9 @@ const Polos: React.FC = () => {
     }
 
     if (polo) {
-      setLista((prev) => [...prev, polo].sort((a, b) => a.nome.localeCompare(b.nome)));
+      setLista((prev) =>
+        [...prev, polo].sort((a, b) => a.nome.localeCompare(b.nome))
+      );
       setNovoNome("");
       showToast(`Polo "${polo.nome}" criado`, "success");
     }
@@ -60,7 +124,9 @@ const Polos: React.FC = () => {
 
     setLista((prev) =>
       prev
-        .map((p) => (p.id === editandoId ? { ...p, nome: editNome.trim() } : p))
+        .map((p) =>
+          p.id === editandoId ? { ...p, nome: editNome.trim() } : p
+        )
         .sort((a, b) => a.nome.localeCompare(b.nome))
     );
     setEditandoId(null);
@@ -68,10 +134,13 @@ const Polos: React.FC = () => {
   };
 
   const excluir = async (id: string, nome: string) => {
-    const ok = await confirm(`Excluir o polo "${nome}"? Só é possível se não houver alunos ou colaboradores vinculados.`, {
-      danger: true,
-      confirmLabel: "Excluir",
-    });
+    const ok = await confirm(
+      `Excluir o polo "${nome}"? Só é possível se não houver alunos ou colaboradores vinculados.`,
+      {
+        danger: true,
+        confirmLabel: "Excluir",
+      }
+    );
     if (!ok) return;
 
     setSaving(true);
@@ -85,6 +154,68 @@ const Polos: React.FC = () => {
 
     setLista((prev) => prev.filter((p) => p.id !== id));
     showToast("Polo excluído", "success");
+  };
+
+  // ---- CRUD setores Itajaí ----
+  const criarSetor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!poloItajai || !novoSetorNome.trim()) return;
+
+    setSaving(true);
+    const { setor, error } = await createSetor(novoSetorNome, poloItajai.id);
+    setSaving(false);
+
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    if (setor) {
+      setSetoresItajai((prev) =>
+        [...prev, setor].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      );
+      setNovoSetorNome("");
+      showToast(`Setor "${setor.nome}" criado`, "success");
+    }
+  };
+
+  const salvarEdicaoSetor = async () => {
+    if (!editandoSetorId || !editSetorNome.trim()) return;
+    setSaving(true);
+    const { error } = await updateSetor(editandoSetorId, {
+      nome: editSetorNome,
+    });
+    setSaving(false);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    setSetoresItajai((prev) =>
+      prev
+        .map((s) =>
+          s.id === editandoSetorId ? { ...s, nome: editSetorNome.trim() } : s
+        )
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+    );
+    setEditandoSetorId(null);
+    showToast("Setor atualizado", "success");
+  };
+
+  const excluirSetor = async (id: string, nome: string) => {
+    const ok = await confirm(
+      `Excluir o setor "${nome}"? Colaboradores e contatos vinculados ficarão sem setor.`,
+      { danger: true, confirmLabel: "Excluir" }
+    );
+    if (!ok) return;
+
+    setSaving(true);
+    const { error } = await deleteSetor(id);
+    setSaving(false);
+    if (error) {
+      showToast(error, "error");
+      return;
+    }
+    setSetoresItajai((prev) => prev.filter((s) => s.id !== id));
+    showToast("Setor excluído", "success");
   };
 
   if (isLoadingAlunos && lista.length === 0) {
@@ -102,78 +233,230 @@ const Polos: React.FC = () => {
         <div>
           <h1>Polos</h1>
           <p className="polos-subtitle">
-            Cadastre as unidades e atribua cada colaborador a um polo na tela de Usuários
+            Cadastre unidades e setores de Engajamento (Itajaí)
           </p>
         </div>
       </div>
 
-      <form className="polos-novo" onSubmit={criar}>
-        <MapPin size={18} />
-        <input
-          type="text"
-          placeholder="Nome do novo polo (ex: Itajaí, Blumenau...)"
-          value={novoNome}
-          onChange={(e) => setNovoNome(e.target.value)}
-          disabled={saving}
-        />
-        <button type="submit" className="btn btn-primary btn-sm" disabled={saving || !novoNome.trim()}>
-          <Plus size={16} /> Adicionar
+      <nav className="polos-tabs" aria-label="Seções de polos">
+        <button
+          type="button"
+          className={`polos-tab${aba === "polos" ? " active" : ""}`}
+          onClick={() => setAba("polos")}
+        >
+          <MapPin size={15} />
+          Polos
         </button>
-      </form>
+        <button
+          type="button"
+          className={`polos-tab${aba === "setores" ? " active" : ""}`}
+          onClick={() => setAba("setores")}
+        >
+          <Layers size={15} />
+          Setores · Itajaí
+        </button>
+      </nav>
 
-      <div className="polos-list">
-        {lista.length === 0 ? (
-          <p className="polos-empty">Nenhum polo cadastrado ainda.</p>
-        ) : (
-          lista.map((polo) => (
-            <div key={polo.id} className="polo-card">
-              {editandoId === polo.id ? (
-                <>
-                  <input
-                    className="polo-edit-input"
-                    value={editNome}
-                    onChange={(e) => setEditNome(e.target.value)}
-                    disabled={saving}
-                    autoFocus
-                  />
-                  <div className="polo-actions">
-                    <button type="button" className="btn btn-success btn-sm" onClick={salvarEdicao} disabled={saving}>
-                      <Check size={14} />
-                    </button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditandoId(null)} disabled={saving}>
-                      <X size={14} />
-                    </button>
-                  </div>
-                </>
+      {aba === "polos" && (
+        <>
+          <form className="polos-novo" onSubmit={criar}>
+            <MapPin size={18} />
+            <input
+              type="text"
+              placeholder="Nome do novo polo (ex: Itajaí, Blumenau...)"
+              value={novoNome}
+              onChange={(e) => setNovoNome(e.target.value)}
+              disabled={saving}
+            />
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={saving || !novoNome.trim()}
+            >
+              <Plus size={16} /> Adicionar
+            </button>
+          </form>
+
+          <div className="polos-list">
+            {lista.length === 0 ? (
+              <p className="polos-empty">Nenhum polo cadastrado ainda.</p>
+            ) : (
+              lista.map((polo) => (
+                <div key={polo.id} className="polo-card">
+                  {editandoId === polo.id ? (
+                    <>
+                      <input
+                        className="polo-edit-input"
+                        value={editNome}
+                        onChange={(e) => setEditNome(e.target.value)}
+                        disabled={saving}
+                        autoFocus
+                      />
+                      <div className="polo-actions">
+                        <button
+                          type="button"
+                          className="btn btn-success btn-sm"
+                          onClick={salvarEdicao}
+                          disabled={saving}
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setEditandoId(null)}
+                          disabled={saving}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="polo-nome">{polo.nome}</span>
+                      <div className="polo-actions">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => iniciarEdicao(polo.id, polo.nome)}
+                          disabled={saving}
+                          title="Renomear"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => excluir(polo.id, polo.nome)}
+                          disabled={saving}
+                          title="Excluir"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {aba === "setores" && (
+        <>
+          {!poloItajai ? (
+            <p className="polos-empty">
+              Polo de Itajaí não encontrado. Cadastre um polo com &quot;Itajaí&quot;
+              no nome na aba Polos para gerenciar setores.
+            </p>
+          ) : (
+            <>
+              <p className="polos-setores-hint">
+                Setores do Engajamento do polo <strong>{poloItajai.nome}</strong>.
+                Só administradores podem criar, editar ou excluir.
+              </p>
+
+              <form className="polos-novo" onSubmit={criarSetor}>
+                <Layers size={18} />
+                <input
+                  type="text"
+                  placeholder="Nome do novo setor (ex: Comercial, Contato...)"
+                  value={novoSetorNome}
+                  onChange={(e) => setNovoSetorNome(e.target.value)}
+                  disabled={saving}
+                />
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  disabled={saving || !novoSetorNome.trim()}
+                >
+                  <Plus size={16} /> Adicionar
+                </button>
+              </form>
+
+              {carregandoSetores ? (
+                <div className="polos-loading" style={{ minHeight: 120 }}>
+                  <Loader2 size={24} className="spin" />
+                  <p>Carregando setores...</p>
+                </div>
               ) : (
-                <>
-                  <span className="polo-nome">{polo.nome}</span>
-                  <div className="polo-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => iniciarEdicao(polo.id, polo.nome)}
-                      disabled={saving}
-                      title="Renomear"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm"
-                      onClick={() => excluir(polo.id, polo.nome)}
-                      disabled={saving}
-                      title="Excluir"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </>
+                <div className="polos-list">
+                  {setoresItajai.length === 0 ? (
+                    <p className="polos-empty">Nenhum setor cadastrado ainda.</p>
+                  ) : (
+                    setoresItajai.map((setor) => (
+                      <div key={setor.id} className="polo-card">
+                        {editandoSetorId === setor.id ? (
+                          <>
+                            <input
+                              className="polo-edit-input"
+                              value={editSetorNome}
+                              onChange={(e) => setEditSetorNome(e.target.value)}
+                              disabled={saving}
+                              autoFocus
+                            />
+                            <div className="polo-actions">
+                              <button
+                                type="button"
+                                className="btn btn-success btn-sm"
+                                onClick={salvarEdicaoSetor}
+                                disabled={saving}
+                              >
+                                <Check size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setEditandoSetorId(null)}
+                                disabled={saving}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="polo-nome">
+                              {setor.nome}
+                              {!setor.ativo && (
+                                <span className="polo-inativo"> inativo</span>
+                              )}
+                            </span>
+                            <div className="polo-actions">
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => {
+                                  setEditandoSetorId(setor.id);
+                                  setEditSetorNome(setor.nome);
+                                }}
+                                disabled={saving}
+                                title="Renomear"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm"
+                                onClick={() => excluirSetor(setor.id, setor.nome)}
+                                disabled={saving}
+                                title="Excluir"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
               )}
-            </div>
-          ))
-        )}
-      </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 };

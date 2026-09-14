@@ -6,34 +6,45 @@ import { useToast } from "../hooks/useToast";
 import { Area, AlunoStatus, CanalContato } from "../types";
 import { TAGS_SELECIONAVEIS_POR_AREA } from "../utils/tags";
 import { AREA_CONFIG } from "../config/areas";
-import { ArrowLeft, Save } from "lucide-react";
+import { normalizarRa, normalizarNomeAluno } from "../services/alunosService";
+import { ArrowLeft, Save, ChevronLeft, ChevronRight, UserPlus, Users } from "lucide-react";
+import DelegarContatoModal from "../components/DelegarContatoModal";
 import "./AlunoForm.css";
+
+type Etapa = 1 | 2 | 3;
+
+const CAMPOS_ETAPA: Record<Etapa, string[]> = {
+  1: ["name", "email", "phone", "ra", "curso", "turno"],
+  2: ["status", "source", "setorId", "value"],
+  3: ["tags", "observations"],
+};
 
 const AlunoForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { getAluno, addAluno, updateAluno, isLoadingAlunos, isAdmin, canGerenciarPolo, polos, alunos, colaboradores } = useAlunos();
+  const {
+    getAluno,
+    addAluno,
+    updateAluno,
+    assumirAluno,
+    isLoadingAlunos,
+    canGerenciarPolo,
+    alunos,
+    colaboradores,
+    setores,
+  } = useAlunos();
   const { user } = useAuth();
   const { showToast } = useToast();
   const isEditing = !!id;
 
-  // Cada atalho de funil abre o mesmo formulário, já configurado para sua
-  // área. Ao editar, a área existente sempre prevalece.
   const isEngajamento = !isEditing && location.pathname.startsWith("/engajamento");
   const isRetencao = !isEditing && location.pathname.startsWith("/retencao");
 
-  // Quando o cadastro é aberto a partir de "Meus Contatos" (?paraMim=1), o
-  // aluno já nasce atribuído a quem está criando, em vez de entrar sem
-  // responsável na aba Alunos — ver botão "Novo Contato" em
-  // MeusContatosEngajamento.tsx.
   const paraMim = new URLSearchParams(location.search).get("paraMim") === "1";
 
   const existingAluno = isEditing ? getAluno(id!) : null;
 
-  // Área efetiva deste formulário: ao editar, é a área que o aluno já tem
-  // hoje (pode ser qualquer uma das 3, já que o card de qualquer Kanban
-  // sempre abre em /alunos/:id/edit); ao criar, é fixa conforme o modo.
   const effectiveArea: Area = isEditing
     ? existingAluno?.area || "rematricula"
     : isEngajamento
@@ -44,95 +55,83 @@ const AlunoForm: React.FC = () => {
 
   const areaConfig = AREA_CONFIG[effectiveArea];
 
-  // Retenção ainda não tem etiquetas próprias definidas; usa o conjunto de
-  // Rematrícula como padrão até que isso seja decidido.
-  const tagsSelecionaveis =
-    TAGS_SELECIONAVEIS_POR_AREA[
-      effectiveArea === "engajamento" ? "engajamento" : "rematricula"
-    ];
-
-  const buildFormData = React.useCallback(
-    () => ({
-      name: existingAluno?.name || "",
-      email: existingAluno?.email || "",
-      phone: existingAluno?.phone || "",
-      ra: existingAluno?.ra || "",
-      curso: existingAluno?.curso || "",
-      turno: existingAluno?.turno || "",
-      status: existingAluno?.status || areaConfig.statusInicial,
-      source: existingAluno?.source || ("telefone" as CanalContato),
-      value: existingAluno?.value?.toString() || "",
-      observations: existingAluno?.observations || "",
-      tags: existingAluno?.tags || ([] as string[]),
-      poloId: existingAluno?.poloId || polos[0]?.id || "",
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [existingAluno, polos]
-  );
+  const buildFormData = () => ({
+    name: existingAluno?.name || "",
+    email: existingAluno?.email || "",
+    phone: existingAluno?.phone || "",
+    ra: existingAluno?.ra || "",
+    curso: existingAluno?.curso || "",
+    turno: existingAluno?.turno || "",
+    status: existingAluno?.status || areaConfig.statusInicial,
+    source: existingAluno?.source || ("telefone" as CanalContato),
+    value: existingAluno?.value?.toString() || "",
+    observations: existingAluno?.observations || "",
+    tags: existingAluno?.tags || ([] as string[]),
+    setorId:
+      existingAluno?.setorId ||
+      (effectiveArea === "engajamento" ? user?.setorId || "" : ""),
+    // Atribuicao: create — colaborador pode "assumir"; gestor pode delegar.
+    assignedTo: existingAluno?.assignedTo || (paraMim ? user?.id || "" : ""),
+  });
 
   const [formData, setFormData] = useState(buildFormData);
-  // Controla se já preenchemos o formulário com os dados reais do aluno
-  // (evita sobrescrever o que o usuário já digitou, caso a lista termine
-  // de carregar bem depois que ele já começou a editar).
   const [hasHydrated, setHasHydrated] = useState(!isEditing);
-
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [etapa, setEtapa] = useState<Etapa>(1);
+  const [mostrarDelegar, setMostrarDelegar] = useState(false);
+  const [assumindo, setAssumindo] = useState(false);
 
-  // Ao cadastrar: avisa se já existe contato parecido no polo (qualquer
-  // responsável). Colaborador vê, mas não edita — evita cadastro duplicado.
   const contatosParecidos = React.useMemo(() => {
     if (isEditing) return [];
-    const nome = formData.name.trim().toLowerCase();
-    const phone = formData.phone.replace(/\D/g, "");
-    const email = formData.email.trim().toLowerCase();
-    const ra = formData.ra.trim().toLowerCase();
-    if (!nome && phone.length < 8 && !email && !ra) return [];
+    const nomeNorm = normalizarNomeAluno(formData.name);
+    const raNorm = normalizarRa(formData.ra);
+    if (!nomeNorm && !raNorm) return [];
 
-    return alunos
-      .filter((a) => {
-        if (ra && a.ra && a.ra.toLowerCase() === ra) return true;
-        if (email && a.email && a.email.toLowerCase() === email) return true;
-        const aPhone = (a.phone || "").replace(/\D/g, "");
-        if (phone.length >= 8 && aPhone.length >= 8) {
-          if (aPhone.endsWith(phone.slice(-8)) || phone.endsWith(aPhone.slice(-8))) {
-            return true;
-          }
-        }
-        if (nome.length >= 3 && a.name.toLowerCase().includes(nome)) return true;
-        return false;
-      })
-      .slice(0, 5);
-  }, [isEditing, formData.name, formData.phone, formData.email, formData.ra, alunos]);
+    type Hit = { aluno: (typeof alunos)[0]; motivo: "ra" | "nome" };
+    const hits: Hit[] = [];
 
+    for (const a of alunos) {
+      const aRa = a.ra ? normalizarRa(a.ra) : "";
+      const aNome = normalizarNomeAluno(a.name);
+      if (raNorm && aRa && aRa === raNorm) {
+        hits.push({ aluno: a, motivo: "ra" });
+        continue;
+      }
+      // Nome exatamente igual (normalizado) — avisa no cadastro
+      if (nomeNorm.length >= 3 && aNome && aNome === nomeNorm) {
+        hits.push({ aluno: a, motivo: "nome" });
+      }
+    }
 
-  // Enquanto a lista de alunos ainda está carregando do banco, "não
-  // encontrado" ainda não é um veredito confiável — só decidimos isso
-  // depois que o carregamento inicial terminou.
+    // Prioriza RA, depois nome; no máximo 5
+    hits.sort((x, y) => (x.motivo === "ra" ? 0 : 1) - (y.motivo === "ra" ? 0 : 1));
+    return hits.slice(0, 5);
+  }, [isEditing, formData.name, formData.ra, alunos]);
+
   useEffect(() => {
-    if (!isEditing || isLoadingAlunos) return;
-
+    if (!isEditing) return;
+    if (isLoadingAlunos) return;
     if (!existingAluno) {
       showToast("Aluno não encontrado!", "error");
-      navigate("/alunos");
+      navigate(-1);
       return;
     }
-
-    // Admin/supervisor podem editar qualquer contato do polo (ex.: corrigir
-    // cadastro com informações erradas), mesmo sem ser o responsável.
-    // Colaborador só edita contatos atribuídos a ele.
-    const isOwner = existingAluno.assignedTo === user?.id;
-    if (!canGerenciarPolo && !isOwner) {
+    if (
+      !canGerenciarPolo &&
+      existingAluno.assignedTo &&
+      existingAluno.assignedTo !== user?.id
+    ) {
       showToast("Você não tem permissão para editar este contato.", "error");
-      navigate(`/alunos/${id}`);
+      navigate(-1);
       return;
     }
-
     if (!hasHydrated) {
       setFormData(buildFormData());
       setHasHydrated(true);
     }
-  }, [isEditing, isLoadingAlunos, existingAluno, hasHydrated, buildFormData, navigate, showToast, canGerenciarPolo, user?.id, id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, isLoadingAlunos, existingAluno, hasHydrated, navigate, showToast, canGerenciarPolo, user?.id, id]);
 
   const statuses: { value: AlunoStatus; label: string }[] = areaConfig.statuses.map(
     (status) => ({ value: status, label: areaConfig.getLabel(status) })
@@ -148,28 +147,19 @@ const AlunoForm: React.FC = () => {
     { value: "outro", label: "Outro" },
   ];
 
-  const turnos = ["Matutino", "Vespertino", "Noturno", "EAD"];
+  const tagsSelecionaveis = TAGS_SELECIONAVEIS_POR_AREA[effectiveArea] || [];
 
   if (isEditing && !hasHydrated) {
     return (
       <div className="lead-form-page">
-        <div className="lead-form-header">
-          <button className="btn btn-secondary" onClick={() => navigate(-1)}>
-            <ArrowLeft size={20} />
-            <span>Voltar</span>
-          </button>
-          <h1>Editar Aluno</h1>
-        </div>
-        <div className="lead-form-container">
-          <p>Carregando dados do aluno...</p>
-        </div>
+        <p>Carregando...</p>
       </div>
     );
   }
 
   const handleChange = (
     e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >
   ) => {
     const { name, value } = e.target;
@@ -188,7 +178,7 @@ const AlunoForm: React.FC = () => {
     }));
   };
 
-  const validate = (): boolean => {
+  const coletarErros = (): Record<string, string> => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
@@ -205,21 +195,55 @@ const AlunoForm: React.FC = () => {
       newErrors.phone = "Telefone é obrigatório";
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!formData.ra.trim()) {
+      newErrors.ra = "RA / Matrícula é obrigatório";
+    }
+
+    if (effectiveArea === "engajamento" && !formData.setorId) {
+      newErrors.setorId = "Setor é obrigatório no Engajamento";
+    }
+
+    return newErrors;
+  };
+
+  const etapaDoPrimeiroErro = (errs: Record<string, string>): Etapa => {
+    const camposComErro = Object.keys(errs);
+    for (const e of [1, 2, 3] as Etapa[]) {
+      if (CAMPOS_ETAPA[e].some((c) => camposComErro.includes(c))) {
+        return e;
+      }
+    }
+    return 1;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate() || !user) return;
+    const newErrors = coletarErros();
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      const destino = etapaDoPrimeiroErro(newErrors);
+      setEtapa(destino);
+      showToast(
+        "Preencha os campos obrigatórios destacados para continuar.",
+        "error"
+      );
+      return;
+    }
+
+    if (!user) return;
+    if (!user.poloId) {
+      showToast(
+        "Seu usuário não tem um polo definido. Peça a um admin para configurar seu polo antes de cadastrar alunos.",
+        "error"
+      );
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
-      // No modo Engajamento o atendente não escolhe/marca essas tags: o
-      // sistema aplica "Calouro" e "Nova Matrícula" automaticamente ao
-      // salvar (ver README.md seção 4-5).
       const tags = isEngajamento
         ? Array.from(new Set([...formData.tags, "Calouro", "Nova Matrícula"]))
         : formData.tags;
@@ -228,7 +252,7 @@ const AlunoForm: React.FC = () => {
         name: formData.name.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
-        ra: formData.ra.trim() || undefined,
+        ra: formData.ra.trim(),
         curso: formData.curso.trim() || undefined,
         turno: formData.turno.trim() || undefined,
         status: isEngajamento ? areaConfig.statusInicial : formData.status,
@@ -241,7 +265,9 @@ const AlunoForm: React.FC = () => {
       if (isEditing) {
         await updateAluno(id!, {
           ...alunoData,
-          ...(isAdmin ? { poloId: formData.poloId || undefined } : {}),
+          ...(effectiveArea === "engajamento"
+            ? { setorId: formData.setorId || undefined }
+            : {}),
         });
         showToast("Aluno atualizado com sucesso!", "success");
         navigate(`/alunos/${id}`);
@@ -251,11 +277,16 @@ const AlunoForm: React.FC = () => {
           area: effectiveArea,
           statusAtualizadoEm: new Date(),
           createdBy: user.id,
-          assignedTo: paraMim ? user.id : undefined,
-          ...(isAdmin && formData.poloId ? { poloId: formData.poloId } : {}),
+          poloId: user.poloId,
+          assignedTo: formData.assignedTo || undefined,
+          ...(effectiveArea === "engajamento" && formData.setorId
+            ? { setorId: formData.setorId }
+            : {}),
         });
         showToast(
-          paraMim ? "Contato criado e atribuído a você!" : "Aluno criado com sucesso!",
+          paraMim
+            ? "Contato criado e atribuído a você!"
+            : "Aluno criado com sucesso!",
           "success"
         );
         navigate(
@@ -274,6 +305,12 @@ const AlunoForm: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const tituloEtapa: Record<Etapa, string> = {
+    1: "Informações básicas",
+    2: "Classificação",
+    3: "Informações adicionais",
   };
 
   return (
@@ -297,234 +334,437 @@ const AlunoForm: React.FC = () => {
       </div>
 
       <div className="lead-form-container">
+        <nav className="form-steps" aria-label="Etapas do formulário">
+          {([1, 2, 3] as Etapa[]).map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`form-step${etapa === n ? " form-step--active" : ""}${
+                etapa > n ? " form-step--done" : ""
+              }`}
+              onClick={() => setEtapa(n)}
+            >
+              <span className="form-step-num">{n}</span>
+              <span className="form-step-label">{tituloEtapa[n]}</span>
+            </button>
+          ))}
+        </nav>
+
         <form onSubmit={handleSubmit} className="lead-form">
-        {contatosParecidos.length > 0 && (
-          <div className="form-duplicado-aviso" role="status">
-            <strong>
-              {contatosParecidos.length === 1
-                ? "Já existe um contato parecido no polo"
-                : `Já existem ${contatosParecidos.length} contatos parecidos no polo`}
-            </strong>
-            <ul>
-              {contatosParecidos.map((a) => {
-                const resp =
-                  colaboradores.find((c) => c.id === a.assignedTo)?.name ||
-                  (a.assignedTo ? "outro colaborador" : "sem responsável");
-                return (
-                  <li key={a.id}>
-                    <span>{a.name}</span>
-                    {a.ra ? <span> · RA {a.ra}</span> : null}
-                    {a.phone ? <span> · {a.phone}</span> : null}
-                    <span> · {resp}</span>
-                    <span> · {a.area}</span>
-                  </li>
-                );
-              })}
-            </ul>
-            <p>
-              Não cadastre de novo. Se precisar tratar este aluno, peça
-              delegação ao responsável ou fale com o admin/supervisor.
-            </p>
-          </div>
-        )}
-          {/* Informações Básicas */}
-          <div className="form-section">
-            <h2>Informações Básicas</h2>
-            <div className="form-grid">
-              <div className="form-group">
-                <label htmlFor="name">
-                  Nome <span className="required">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className={errors.name ? "error" : ""}
-                  placeholder="Nome completo do aluno"
-                />
-                {errors.name && (
-                  <span className="error-message">{errors.name}</span>
-                )}
-              </div>
+          {contatosParecidos.length > 0 && (
+            <div className="form-duplicado-aviso" role="status">
+              <strong>
+                {contatosParecidos.some((h) => h.motivo === "ra")
+                  ? "Possível duplicidade de RA (normalizado em 10 dígitos)"
+                  : "Possível duplicidade de nome"}
+              </strong>
+              <ul>
+                {contatosParecidos.map(({ aluno: a, motivo }) => {
+                  const resp =
+                    colaboradores.find((c) => c.id === a.assignedTo)?.name ||
+                    (a.assignedTo ? "outro colaborador" : "sem responsável");
+                  return (
+                    <li key={`${a.id}-${motivo}`}>
+                      <span>{a.name}</span>
+                      {a.ra ? (
+                        <span>
+                          {" "}
+                          · RA {a.ra} ({normalizarRa(a.ra)})
+                        </span>
+                      ) : null}
+                      <span>
+                        {" "}
+                        · motivo: {motivo === "ra" ? "mesmo RA" : "mesmo nome"}
+                      </span>
+                      <span> · {resp}</span>
+                      <span> · {a.area}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p>
+                O RA é comparado só com números, em 10 dígitos (sem pontos ou
+                traços). Mesmo RA bloqueia o cadastro ao salvar; mesmo nome
+                apenas avisa — confira antes de criar de novo. Se precisar
+                tratar o contato existente, peça delegação ao responsável ou
+                fale com o admin/supervisor.
+              </p>
+            </div>
+          )}
 
-              <div className="form-group">
-                <label htmlFor="email">
-                  Email <span className="required">*</span>
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={errors.email ? "error" : ""}
-                  placeholder="email@exemplo.com"
-                />
-                {errors.email && (
-                  <span className="error-message">{errors.email}</span>
-                )}
-              </div>
+          {etapa === 1 && (
+            <div className="form-section">
+              <h2>Informações básicas</h2>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="name">
+                    Nome <span className="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className={errors.name ? "error" : ""}
+                    placeholder="Nome completo do aluno"
+                  />
+                  {errors.name && (
+                    <span className="error-message">{errors.name}</span>
+                  )}
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="phone">
-                  Telefone <span className="required">*</span>
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className={errors.phone ? "error" : ""}
-                  placeholder="(00) 00000-0000"
-                />
-                {errors.phone && (
-                  <span className="error-message">{errors.phone}</span>
-                )}
-              </div>
+                <div className="form-group">
+                  <label htmlFor="email">
+                    Email <span className="required">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={errors.email ? "error" : ""}
+                    placeholder="email@exemplo.com"
+                  />
+                  {errors.email && (
+                    <span className="error-message">{errors.email}</span>
+                  )}
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="ra">RA / Matrícula</label>
-                <input
-                  type="text"
-                  id="ra"
-                  name="ra"
-                  value={formData.ra}
-                  onChange={handleChange}
-                  placeholder="Número de matrícula"
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="phone">
+                    Telefone <span className="required">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className={errors.phone ? "error" : ""}
+                    placeholder="(00) 00000-0000"
+                  />
+                  {errors.phone && (
+                    <span className="error-message">{errors.phone}</span>
+                  )}
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="curso">Curso</label>
-                <input
-                  type="text"
-                  id="curso"
-                  name="curso"
-                  value={formData.curso}
-                  onChange={handleChange}
-                  placeholder="Nome do curso"
-                />
-              </div>
+                <div className="form-group">
+                  <label htmlFor="ra">
+                    RA / Matrícula <span className="required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="ra"
+                    name="ra"
+                    value={formData.ra}
+                    onChange={handleChange}
+                    className={errors.ra ? "error" : ""}
+                    placeholder="Somente números (normalizado em 10 dígitos)"
+                  />
+                  {formData.ra.trim() && normalizarRa(formData.ra) && (
+                    <span className="form-hint">
+                      Normalizado: {normalizarRa(formData.ra)}
+                    </span>
+                  )}
+                  {errors.ra && (
+                    <span className="error-message">{errors.ra}</span>
+                  )}
+                </div>
 
-              <div className="form-group">
-                <label htmlFor="turno">Turno</label>
-                <select
-                  id="turno"
-                  name="turno"
-                  value={formData.turno}
-                  onChange={handleChange}
-                >
-                  <option value="">Selecione</option>
-                  {turnos.map((turno) => (
-                    <option key={turno} value={turno}>
-                      {turno}
-                    </option>
-                  ))}
-                </select>
+                <div className="form-group">
+                  <label htmlFor="curso">Curso</label>
+                  <input
+                    type="text"
+                    id="curso"
+                    name="curso"
+                    value={formData.curso}
+                    onChange={handleChange}
+                    placeholder="Ex.: Administração"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="turno">Turno</label>
+                  <input
+                    type="text"
+                    id="turno"
+                    name="turno"
+                    value={formData.turno}
+                    onChange={handleChange}
+                    placeholder="Ex.: Noite"
+                  />
+                </div>
+
+
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Status e Canal */}
-          <div className="form-section">
-            <h2>Classificação</h2>
-            <div className="form-grid">
-              {!isEngajamento && (
+          {etapa === 2 && (
+            <div className="form-section">
+              <h2>Classificação</h2>
+              <div className="form-grid">
+                {!isEngajamento && (
+                  <div className="form-group">
+                    <label htmlFor="status">Status</label>
+                    <select
+                      id="status"
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                    >
+                      {statuses.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="form-group">
-                  <label htmlFor="status">Status</label>
+                  <label htmlFor="source">Canal de Contato</label>
                   <select
-                    id="status"
-                    name="status"
-                    value={formData.status}
+                    id="source"
+                    name="source"
+                    value={formData.source}
                     onChange={handleChange}
                   >
-                    {statuses.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
+                    {sources.map((source) => (
+                      <option key={source.value} value={source.value}>
+                        {source.label}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
 
-              <div className="form-group">
-                <label htmlFor="source">Canal de Contato</label>
-                <select
-                  id="source"
-                  name="source"
-                  value={formData.source}
-                  onChange={handleChange}
-                >
-                  {sources.map((source) => (
-                    <option key={source.value} value={source.value}>
-                      {source.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="value">Débito/Valor Pendente (R$)</label>
-                <input
-                  type="number"
-                  id="value"
-                  name="value"
-                  value={formData.value}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Observações e Tags */}
-          <div className="form-section">
-            <h2>Informações Adicionais</h2>
-            <div className="form-group">
-              <label>Tags</label>
-              <div className="tags-picker">
-                {tagsSelecionaveis.map((tag) => {
-                  const selected = formData.tags.includes(tag);
-                  return (
-                    <button
-                      type="button"
-                      key={tag}
-                      className={`tag-chip${selected ? " tag-chip-selected" : ""}`}
-                      onClick={() => toggleTag(tag)}
-                      aria-pressed={selected}
+                {effectiveArea === "engajamento" && (
+                  <div className="form-group">
+                    <label htmlFor="setorId">
+                      Setor <span className="required">*</span>
+                    </label>
+                    <select
+                      id="setorId"
+                      name="setorId"
+                      value={formData.setorId}
+                      onChange={handleChange}
+                      className={errors.setorId ? "error" : ""}
+                      disabled={!canGerenciarPolo}
                     >
-                      {tag}
-                    </button>
-                  );
-                })}
+                      <option value="">Selecione o setor</option>
+                      {setores
+                        .filter((s) =>
+                          user?.poloId ? s.poloId === user.poloId : true
+                        )
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.nome}
+                          </option>
+                        ))}
+                    </select>
+                    {errors.setorId && (
+                      <span className="error-message">{errors.setorId}</span>
+                    )}
+                    {!canGerenciarPolo && user?.setorNome && (
+                      <span className="form-hint">
+                        Seu setor: {user.setorNome}
+                      </span>
+                    )}
+                    {canGerenciarPolo &&
+                      formData.assignedTo &&
+                      formData.setorId &&
+                      (() => {
+                        const colab = colaboradores.find(
+                          (c) => c.id === formData.assignedTo
+                        );
+                        if (colab?.setorId && colab.setorId === formData.setorId) {
+                          return (
+                            <span className="form-hint">
+                              Setor preenchido pelo colaborador
+                              {colab.setorNome ? ` (${colab.setorNome})` : ""}.
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label htmlFor="value">Débito/Valor Pendente (R$)</label>
+                  <input
+                    type="number"
+                    id="value"
+                    name="value"
+                    value={formData.value}
+                    onChange={handleChange}
+                    placeholder="0,00"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+
+                {/* Responsável — Assumir / Delegar conforme política */}
+                <div className="form-group form-group--full">
+                  <label>Responsável pelo contato</label>
+                  <div className="form-responsavel-box">
+                    <p className="form-hint" style={{ marginTop: 0 }}>
+                      {formData.assignedTo
+                        ? `Atual: ${
+                            colaboradores.find((c) => c.id === formData.assignedTo)?.name ||
+                            (formData.assignedTo === user?.id ? (user?.name || "Você") : "Colaborador")
+                          }`
+                        : "Sem responsável"}
+                    </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                      {/* Colaborador: assume se ainda não tem dono (criação ou edição) */}
+                      {!canGerenciarPolo && !formData.assignedTo && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          disabled={assumindo}
+                          onClick={async () => {
+                            if (!user) return;
+                            if (isEditing && id) {
+                              setAssumindo(true);
+                              try {
+                                await assumirAluno(id);
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  assignedTo: user.id,
+                                  setorId: user.setorId || prev.setorId,
+                                }));
+                                showToast("Contato assumido com sucesso.", "success");
+                              } catch {
+                                showToast("Erro ao assumir contato.", "error");
+                              } finally {
+                                setAssumindo(false);
+                              }
+                            } else {
+                              setFormData((prev) => ({
+                                ...prev,
+                                assignedTo: user.id,
+                                setorId: user.setorId || prev.setorId,
+                              }));
+                              showToast("Contato será atribuído a você ao salvar.", "success");
+                            }
+                          }}
+                        >
+                          <UserPlus size={16} />
+                          {assumindo ? "Assumindo..." : "Assumir contato"}
+                        </button>
+                      )}
+                      {/* Colaborador já com assignedTo = eu: pode desmarcar na criação */}
+                      {!canGerenciarPolo && !isEditing && formData.assignedTo === user?.id && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() =>
+                            setFormData((prev) => ({ ...prev, assignedTo: "" }))
+                          }
+                        >
+                          Remover atribuição
+                        </button>
+                      )}
+                      {/* Gestor: delegar */}
+                      {canGerenciarPolo && (
+                        <>
+                          {isEditing && existingAluno ? (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setMostrarDelegar(true)}
+                            >
+                              <Users size={16} />
+                              {formData.assignedTo ? "Reatribuir contato" : "Delegar contato"}
+                            </button>
+                          ) : (
+                            <select
+                              className="filter-select"
+                              style={{ minWidth: 220 }}
+                              value={formData.assignedTo}
+                              onChange={(e) => {
+                                const colabId = e.target.value;
+                                const colab = colaboradores.find((c) => c.id === colabId);
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  assignedTo: colabId,
+                                  // Se o colaborador já tem setor, herda automaticamente
+                                  ...(colab?.setorId
+                                    ? { setorId: colab.setorId }
+                                    : {}),
+                                }));
+                                if (colab?.setorId && errors.setorId) {
+                                  setErrors((prev) => ({ ...prev, setorId: "" }));
+                                }
+                              }}
+                            >
+                              <option value="">Sem responsável</option>
+                              {colaboradores.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                  {c.setorNome ? ` · ${c.setorNome}` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
               </div>
-              <small>
-                {isEngajamento
-                  ? 'Clique para adicionar outras etiquetas. "Calouro" e "Nova Matrícula" são aplicadas automaticamente ao salvar.'
-                  : "Clique para adicionar ou remover uma etiqueta"}
-              </small>
             </div>
+          )}
 
-            <div className="form-group">
-              <label htmlFor="observations">Observações</label>
-              <textarea
-                id="observations"
-                name="observations"
-                value={formData.observations}
-                onChange={handleChange}
-                placeholder="Informações adicionais sobre o aluno..."
-                rows={4}
-              />
+          {etapa === 3 && (
+            <div className="form-section">
+              <h2>Informações adicionais</h2>
+              <div className="form-group">
+                <label>Tags</label>
+                <div className="tags-picker">
+                  {tagsSelecionaveis.map((tag) => {
+                    const selected = formData.tags.includes(tag);
+                    return (
+                      <button
+                        type="button"
+                        key={tag}
+                        className={`tag-chip${
+                          selected ? " tag-chip-selected" : ""
+                        }`}
+                        onClick={() => toggleTag(tag)}
+                        aria-pressed={selected}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+                <small>
+                  {isEngajamento
+                    ? 'Clique para adicionar outras etiquetas. "Calouro" e "Nova Matrícula" são aplicadas automaticamente ao salvar.'
+                    : "Clique para adicionar ou remover uma etiqueta"}
+                </small>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="observations">Observações</label>
+                <textarea
+                  id="observations"
+                  name="observations"
+                  value={formData.observations}
+                  onChange={handleChange}
+                  placeholder="Informacoes adicionais sobre o aluno..."
+                  rows={4}
+                ></textarea>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Botões */}
-          <div className="form-actions">
+          <div className="form-actions form-actions--steps">
             <button
               type="button"
               className="btn btn-secondary"
@@ -533,23 +773,65 @@ const AlunoForm: React.FC = () => {
             >
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting}
-            >
-              <Save size={18} />
-              <span>
-                {isSubmitting
-                  ? "Salvando..."
-                  : isEditing
-                  ? "Salvar Alterações"
-                  : "Criar Aluno"}
-              </span>
-            </button>
+
+            <div className="form-actions-right">
+              {etapa > 1 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEtapa((e) => (e - 1) as Etapa)}
+                  disabled={isSubmitting}
+                >
+                  <ChevronLeft size={18} />
+                  Anterior
+                </button>
+              )}
+
+              {etapa < 3 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEtapa((e) => (e + 1) as Etapa)}
+                  disabled={isSubmitting}
+                >
+                  Próximo
+                  <ChevronRight size={18} />
+                </button>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isSubmitting}
+              >
+                <Save size={18} />
+                <span>
+                  {isSubmitting
+                    ? "Salvando..."
+                    : isEditing
+                    ? "Salvar Alterações"
+                    : "Criar Aluno"}
+                </span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
+      {mostrarDelegar && existingAluno && (
+        <DelegarContatoModal
+          aluno={existingAluno}
+          onClose={() => {
+            setMostrarDelegar(false);
+            const atualizado = getAluno(id!);
+            if (atualizado) {
+              setFormData((prev) => ({
+                ...prev,
+                assignedTo: atualizado.assignedTo || "",
+              }));
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

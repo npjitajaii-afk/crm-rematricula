@@ -69,7 +69,7 @@ const NovaMatriculaModal: React.FC<NovaMatriculaModalProps> = ({
   }));
   const tagsSelecionaveis =
     area === "rematricula" || area === "engajamento"
-      ? TAGS_SELECIONAVEIS_POR_AREA[area]
+      ? TAGS_SELECIONAVEIS_POR_AREA[area] ?? []
       : [];
 
   const handleAreaChange = (novaArea: Area) => {

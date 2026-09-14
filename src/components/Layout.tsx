@@ -18,6 +18,7 @@ import {
   Send,
   Loader2,
   MapPin,
+  ArrowLeftRight,
 } from "lucide-react";
 import { Area } from "../types";
 import NotificacoesSininho from "./NotificacoesSininho";
@@ -125,6 +126,14 @@ const Layout: React.FC = () => {
       adminOnly: true,
       adminOrder: 7,
       isActive: (p) => p === "/colaboradores",
+    },
+    {
+      path: "/transferencias",
+      icon: ArrowLeftRight,
+      label: "Transferências",
+      adminOnly: true,
+      adminOrder: 7.5,
+      isActive: (p) => p === "/transferencias",
     },
     {
       path: "/polos",
