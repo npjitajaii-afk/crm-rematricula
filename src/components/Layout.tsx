@@ -166,6 +166,14 @@ const Layout: React.FC = () => {
       if (isAdmin) return true;
       // Usuários e Polos: exclusivamente admin
       if (item.path === "/usuarios" || item.path === "/polos") return false;
+      // Transferências: só supervisor com funil de engajamento liberado
+      // (colaborador nunca vê, mesmo com engajamento liberado)
+      if (item.path === "/transferencias") {
+        return (
+          !!canGerenciarPolo &&
+          !!user?.areasPermitidas?.includes("engajamento")
+        );
+      }
       // Métricas, Colaboradores, Dashboard, Grupos: admin + supervisor
       if (item.adminOnly) return !!canGerenciarPolo;
       if (item.area) return !!user?.areasPermitidas?.includes(item.area);

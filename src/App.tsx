@@ -110,7 +110,18 @@ function App() {
                       <Route path="metricas" element={<GestorRoute><MetricasDashboard /></GestorRoute>} />
                       <Route path="grupos" element={<GestorRoute><Grupos /></GestorRoute>} />
                       <Route path="colaboradores" element={<GestorRoute><Colaboradores /></GestorRoute>} />
-                      <Route path="transferencias" element={<GestorRoute><Transferencias /></GestorRoute>} />
+                      {/* Transferências: só gestor (admin/supervisor) E com funil de engajamento liberado.
+                          Colaborador nunca acessa, mesmo tendo engajamento. */}
+                      <Route
+                        path="transferencias"
+                        element={
+                          <GestorRoute>
+                            <AreaRoute area="engajamento">
+                              <Transferencias />
+                            </AreaRoute>
+                          </GestorRoute>
+                        }
+                      />
                       <Route path="polos" element={<AdminRoute><Polos /></AdminRoute>} />
                       <Route path="usuarios" element={<AdminRoute><Usuarios /></AdminRoute>} />
 
