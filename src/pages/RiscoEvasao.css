@@ -46,7 +46,7 @@
   border: 2px solid transparent;
   cursor: pointer;
   font-family: inherit;
-  background: #f8fafc;
+  background: var(--bg-elevated);
   color: inherit;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.1s;
 }
@@ -88,6 +88,50 @@
 .risco-faixa-baixo { background: #f0fdf4; color: #16a34a; }
 .risco-faixa-baixo:hover,
 .risco-faixa-baixo.ativo { border-color: #16a34a; background: #dcfce7; }
+
+/* Dark mode — mantém a identidade de cor com fundos mais escuros */
+html[data-theme="dark"] .risco-faixa-critico,
+html.dark .risco-faixa-critico { background: rgba(220, 38, 38, 0.18) !important; color: #f87171 !important; }
+html[data-theme="dark"] .risco-faixa-critico:hover,
+html[data-theme="dark"] .risco-faixa-critico.ativo,
+html.dark .risco-faixa-critico:hover,
+html.dark .risco-faixa-critico.ativo { border-color: #dc2626 !important; background: rgba(220, 38, 38, 0.28) !important; }
+
+html[data-theme="dark"] .risco-faixa-alto,
+html.dark .risco-faixa-alto { background: rgba(234, 88, 12, 0.18) !important; color: #fb923c !important; }
+html[data-theme="dark"] .risco-faixa-alto:hover,
+html[data-theme="dark"] .risco-faixa-alto.ativo,
+html.dark .risco-faixa-alto:hover,
+html.dark .risco-faixa-alto.ativo { border-color: #ea580c !important; background: rgba(234, 88, 12, 0.28) !important; }
+
+html[data-theme="dark"] .risco-faixa-medio,
+html.dark .risco-faixa-medio { background: rgba(202, 138, 4, 0.18) !important; color: #facc15 !important; }
+html[data-theme="dark"] .risco-faixa-medio:hover,
+html[data-theme="dark"] .risco-faixa-medio.ativo,
+html.dark .risco-faixa-medio:hover,
+html.dark .risco-faixa-medio.ativo { border-color: #ca8a04 !important; background: rgba(202, 138, 4, 0.28) !important; }
+
+html[data-theme="dark"] .risco-faixa-baixo,
+html.dark .risco-faixa-baixo { background: rgba(22, 163, 74, 0.18) !important; color: #4ade80 !important; }
+html[data-theme="dark"] .risco-faixa-baixo:hover,
+html[data-theme="dark"] .risco-faixa-baixo.ativo,
+html.dark .risco-faixa-baixo:hover,
+html.dark .risco-faixa-baixo.ativo { border-color: #16a34a !important; background: rgba(22, 163, 74, 0.28) !important; }
+
+html[data-theme="dark"] .risco-item,
+html.dark .risco-item {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .faixa-badge.faixa-critico,
+html.dark .faixa-badge.faixa-critico { background: rgba(220, 38, 38, 0.22) !important; color: #f87171 !important; }
+html[data-theme="dark"] .faixa-badge.faixa-alto,
+html.dark .faixa-badge.faixa-alto { background: rgba(234, 88, 12, 0.22) !important; color: #fb923c !important; }
+html[data-theme="dark"] .faixa-badge.faixa-medio,
+html.dark .faixa-badge.faixa-medio { background: rgba(202, 138, 4, 0.22) !important; color: #facc15 !important; }
+html[data-theme="dark"] .faixa-badge.faixa-baixo,
+html.dark .faixa-badge.faixa-baixo { background: rgba(22, 163, 74, 0.22) !important; color: #4ade80 !important; }
 
 .risco-filtro-contagem {
   color: var(--text-secondary, #64748b);
@@ -132,12 +176,13 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem 1.25rem;
-  background: white;
+  background: var(--bg-primary);
   border-radius: var(--radius-md);
   border-left: 4px solid transparent;
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: var(--transition);
+  color: var(--text-primary);
 }
 
 .risco-item:hover {
@@ -323,4 +368,115 @@
 @media (max-width: 480px) {
   .risco-score-col { min-width: 52px; }
   .risco-score { font-size: 1.25rem; }
+}
+/* ═══════════════════════════════════════════════════════════════════
+   FORÇA TEMA ESCURO — no final do arquivo para vencer qualquer regra
+   ═══════════════════════════════════════════════════════════════════ */
+html[data-theme="dark"] .risco-faixa-card,
+html.dark .risco-faixa-card {
+  background: var(--bg-elevated) !important;
+}
+
+html[data-theme="dark"] .risco-faixa-critico,
+html.dark .risco-faixa-critico {
+  background: rgba(220, 38, 38, 0.2) !important;
+  color: #f87171 !important;
+}
+html[data-theme="dark"] .risco-faixa-critico:hover,
+html[data-theme="dark"] .risco-faixa-critico.ativo,
+html.dark .risco-faixa-critico:hover,
+html.dark .risco-faixa-critico.ativo {
+  background: rgba(220, 38, 38, 0.32) !important;
+  border-color: #dc2626 !important;
+}
+
+html[data-theme="dark"] .risco-faixa-alto,
+html.dark .risco-faixa-alto {
+  background: rgba(234, 88, 12, 0.2) !important;
+  color: #fb923c !important;
+}
+html[data-theme="dark"] .risco-faixa-alto:hover,
+html[data-theme="dark"] .risco-faixa-alto.ativo,
+html.dark .risco-faixa-alto:hover,
+html.dark .risco-faixa-alto.ativo {
+  background: rgba(234, 88, 12, 0.32) !important;
+  border-color: #ea580c !important;
+}
+
+html[data-theme="dark"] .risco-faixa-medio,
+html.dark .risco-faixa-medio {
+  background: rgba(202, 138, 4, 0.2) !important;
+  color: #facc15 !important;
+}
+html[data-theme="dark"] .risco-faixa-medio:hover,
+html[data-theme="dark"] .risco-faixa-medio.ativo,
+html.dark .risco-faixa-medio:hover,
+html.dark .risco-faixa-medio.ativo {
+  background: rgba(202, 138, 4, 0.32) !important;
+  border-color: #ca8a04 !important;
+}
+
+html[data-theme="dark"] .risco-faixa-baixo,
+html.dark .risco-faixa-baixo {
+  background: rgba(22, 163, 74, 0.2) !important;
+  color: #4ade80 !important;
+}
+html[data-theme="dark"] .risco-faixa-baixo:hover,
+html[data-theme="dark"] .risco-faixa-baixo.ativo,
+html.dark .risco-faixa-baixo:hover,
+html.dark .risco-faixa-baixo.ativo {
+  background: rgba(22, 163, 74, 0.32) !important;
+  border-color: #16a34a !important;
+}
+
+html[data-theme="dark"] .risco-item,
+html.dark .risco-item {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+html[data-theme="dark"] .risco-nome,
+html.dark .risco-nome {
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .risco-detalhe,
+html[data-theme="dark"] .risco-status-label,
+html.dark .risco-detalhe,
+html.dark .risco-status-label {
+  color: var(--text-secondary) !important;
+}
+
+html[data-theme="dark"] .risco-tag,
+html.dark .risco-tag {
+  background: var(--gray-100) !important;
+  color: var(--text-secondary) !important;
+}
+
+html[data-theme="dark"] .faixa-badge.faixa-critico,
+html.dark .faixa-badge.faixa-critico {
+  background: rgba(220, 38, 38, 0.25) !important;
+  color: #f87171 !important;
+}
+html[data-theme="dark"] .faixa-badge.faixa-alto,
+html.dark .faixa-badge.faixa-alto {
+  background: rgba(234, 88, 12, 0.25) !important;
+  color: #fb923c !important;
+}
+html[data-theme="dark"] .faixa-badge.faixa-medio,
+html.dark .faixa-badge.faixa-medio {
+  background: rgba(202, 138, 4, 0.25) !important;
+  color: #facc15 !important;
+}
+html[data-theme="dark"] .faixa-badge.faixa-baixo,
+html.dark .faixa-badge.faixa-baixo {
+  background: rgba(22, 163, 74, 0.25) !important;
+  color: #4ade80 !important;
+}
+
+html[data-theme="dark"] .risco-legenda summary,
+html.dark .risco-legenda summary {
+  background: var(--gray-50) !important;
+  color: var(--text-secondary) !important;
 }

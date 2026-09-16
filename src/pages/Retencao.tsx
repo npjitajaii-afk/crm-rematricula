@@ -10,17 +10,18 @@ import "./Alunos.css";
  * "desistente" na Rematrícula (via trigger no banco). Não tem cadastro
  * manual — por isso, diferente de /alunos e /engajamento, esta página não
  * tem botão "Novo Aluno". Ver README.md seção 1.
+ *
+ * Busca e filtros são 100% locais (SCOPE_ID) — não gravam no AlunosContext
+ * e portanto não interferem em Rematrícula, Engajamento ou Meus Contatos.
  */
+const SCOPE_ID = "retencao";
+
 const Retencao: React.FC = () => {
-  const { alunos, filters, setFilters } = useAlunos();
-  const [searchTerm, setSearchTerm] = useState(filters.search || "");
+  const { alunos } = useAlunos();
+  // Busca LOCAL — isolada das demais abas.
+  const [searchTerm, setSearchTerm] = useState("");
 
   const totalRetencao = alunos.filter((a) => a.area === "retencao").length;
-
-  const handleSearch = (value: string) => {
-    setSearchTerm(value);
-    setFilters({ ...filters, search: value });
-  };
 
   return (
     <div className="leads-page">
@@ -39,13 +40,14 @@ const Retencao: React.FC = () => {
 
       <div className="leads-toolbar">
         <SearchBox
-        placeholder="Buscar por nome, email, RA, curso..."
-        value={searchTerm}
-        onChange={handleSearch}
-      />
+          id={`search-${SCOPE_ID}`}
+          placeholder="Buscar por nome, email, RA, curso..."
+          value={searchTerm}
+          onChange={setSearchTerm}
+        />
       </div>
 
-      <KanbanBoard area="retencao" />
+      <KanbanBoard area="retencao" searchTerm={searchTerm} />
     </div>
   );
 };

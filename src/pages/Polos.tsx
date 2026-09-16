@@ -74,7 +74,7 @@ const Polos: React.FC = () => {
       showToast(error, "error");
       return;
     }
-    setSetoresItajai(setores.filter((s) => s.nome !== "Geral"));
+    setSetoresItajai(setores.filter((s) => s.nome !== "Geral" && s.nome !== "Pendente"));
   }, [poloItajai, showToast]);
 
   useEffect(() => {

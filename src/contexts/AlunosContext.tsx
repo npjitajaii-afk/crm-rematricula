@@ -1083,9 +1083,11 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       area?: Area;
       fileNamePrefix?: string;
     }): Promise<void> => {
+      // Exporta a partir da lista completa (`alunos`), não de `filteredAlunos`
+      // do UI — a exportação não deve depender de filtros de uma sub-aba.
       const lista = options?.area
-        ? filteredAlunos.filter((aluno) => aluno.area === options.area)
-        : filteredAlunos;
+        ? alunos.filter((aluno) => aluno.area === options.area)
+        : alunos;
 
       const dataToExport = lista.map((aluno) => {
         const responsavel = colaboradores.find(
@@ -1134,7 +1136,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       }.xlsx`;
       XLSX.writeFile(workbook, fileName);
     },
-    [filteredAlunos, colaboradores]
+    [alunos, colaboradores]
   );
 
   // Otimização (Bloco B): o value do Provider era um objeto literal novo a

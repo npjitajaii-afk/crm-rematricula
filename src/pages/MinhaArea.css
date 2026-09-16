@@ -7,6 +7,7 @@
 .minha-area-header h1 {
   font-size: 1.75rem;
   margin-bottom: 0.25rem;
+  color: var(--text-primary);
 }
 
 .minha-area-subtitle {
@@ -22,13 +23,14 @@
 }
 
 .resumo-card {
-  background-color: #fff;
+  background-color: var(--bg-primary);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   padding: 1.25rem;
   display: flex;
   align-items: center;
   gap: 0.9rem;
+  color: var(--text-primary);
 }
 
 .resumo-icon {
@@ -77,10 +79,11 @@
 }
 
 .panel-card {
-  background-color: #fff;
+  background-color: var(--bg-primary);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   padding: 1.25rem 1.5rem 1.5rem;
+  color: var(--text-primary);
 }
 
 .panel-header {
@@ -96,6 +99,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  color: var(--text-primary);
 }
 
 .panel-link {
@@ -167,7 +171,7 @@
   height: 26px;
   border-radius: 50%;
   border: 1px solid var(--gray-300);
-  background-color: #fff;
+  background-color: var(--bg-elevated);
   color: var(--text-secondary);
   display: flex;
   align-items: center;

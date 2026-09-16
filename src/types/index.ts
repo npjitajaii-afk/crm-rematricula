@@ -548,3 +548,31 @@ export interface SolicitacaoTransferencia {
   decididoEm?: string;
   createdAt: string;
 }
+
+/** Tipos de evento da trilha de auditoria (aba Relatório). */
+export type AuditoriaEventoTipo = "criacao" | "status" | "transferencia";
+
+/** Evento de auditoria (criação, mudança de status ou transferência). */
+export interface AuditoriaEvento {
+  id: string;
+  alunoId?: string;
+  alunoNome?: string;
+  poloId?: string;
+  area?: Area;
+  tipo: AuditoriaEventoTipo;
+  payload: Record<string, unknown>;
+  actorId?: string;
+  actorNome?: string;
+  createdAt: string;
+}
+
+/** Filtros da listagem do Relatório (sempre locais à página). */
+export interface AuditoriaFiltros {
+  tipo?: AuditoriaEventoTipo | "";
+  area?: Area | "";
+  actorId?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  poloId?: string;
+}

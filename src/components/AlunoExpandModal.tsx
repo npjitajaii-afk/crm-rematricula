@@ -33,6 +33,7 @@ import {
   autorizarSolicitacaoTransferencia,
   cancelarSolicitacaoTransferencia,
 } from "../services/transferenciasService";
+import { useTransferenciasPendentes } from "../hooks/useTransferenciasPendentes";
 import { AREA_CONFIG } from "../config/areas";
 import { TAGS_SELECIONAVEIS_POR_AREA, TAGS_DISPONIVEIS } from "../utils/tags";
 import { getStatusColor, getStatusLabel } from "../utils/formatters";
@@ -87,6 +88,7 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
   const { showToast } = useToast();
 
   const { user } = useAuth();
+  const { refresh: refreshPendentesGlobais } = useTransferenciasPendentes();
   const [aluno, setAluno] = useState(getAluno(alunoId));
   // Quando o card clicado é o de uma matrícula vinculada (outra área/funil),
   // ela pode ainda não estar carregada na lista `alunos` do contexto (a
@@ -342,6 +344,7 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
         setSetorDestinoSol("");
         setColabDestinoSol("");
         await carregarSolsTransferencia();
+        await refreshPendentesGlobais();
       }
     } finally {
       setEnviandoSol(false);
@@ -361,6 +364,7 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
           aprovar ? "success" : "info"
         );
         await carregarSolsTransferencia();
+        await refreshPendentesGlobais();
       }
     } finally {
       setAcaoSolId(null);
@@ -375,6 +379,7 @@ const AlunoExpandModal: React.FC<AlunoExpandModalProps> = ({
       else {
         showToast("Solicitação cancelada.", "success");
         await carregarSolsTransferencia();
+        await refreshPendentesGlobais();
       }
     } finally {
       setAcaoSolId(null);

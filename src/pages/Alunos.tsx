@@ -3,8 +3,8 @@ import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
+import { useTransferenciasPendentes } from "../hooks/useTransferenciasPendentes";
 import { useNavigate } from "react-router-dom";
-import { AlunoStatus, CanalContato } from "../types";
 import {
   Plus,
   Filter,
@@ -21,11 +21,14 @@ import DelegarContatoModal from "../components/DelegarContatoModal";
 import "./Alunos.css";
 import "../components/AlunoSwipeRow.css";
 
+/** Escopo único desta sub-aba (Rematrícula → Alunos). Filtros e busca
+ *  ficam 100% locais — não gravam em `filters` do AlunosContext e portanto
+ *  não interferem em Engajamento, Meus Contatos, Retenção etc. */
+const SCOPE_ID = "rematricula-alunos";
+
 const Alunos: React.FC = () => {
   const {
-    filteredAlunos: filteredAlunosTodasAreas,
-    filters,
-    setFilters,
+    alunos,
     exportAlunos,
     importAlunos,
     deleteAluno,
@@ -35,70 +38,36 @@ const Alunos: React.FC = () => {
     colaboradores,
   } = useAlunos();
 
-  // Esta página é exclusiva do funil de Rematrícula. Retenção e Engajamento
-  // têm suas próprias páginas (/retencao e /engajamento), então mesmo com
-  // filtros aplicados, nunca misturamos alunos de outra área aqui.
-  const filteredAlunos = filteredAlunosTodasAreas.filter(
-    (aluno) => aluno.area === "rematricula"
-  );
-
-  // Correção de performance: com centenas de contatos (ex: importação de
-  // não renovados), renderizar a lista inteira de uma vez deixa a tela
-  // pesada (muitos nós de DOM + estado próprio de cada linha). Em vez de
-  // reescrever a lista pra virtualizada, paginamos no cliente — mudança
-  // pequena, sem tocar no resto do fluxo (seleção continua valendo sobre
-  // todos os filtrados, não só a página atual).
-  const PAGE_SIZE = 10;
-  const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(filteredAlunos.length / PAGE_SIZE));
-  const paginatedAlunos = useMemo(
-    () =>
-      filteredAlunos.slice(
-        (currentPage - 1) * PAGE_SIZE,
-        currentPage * PAGE_SIZE
-      ),
-    [filteredAlunos, currentPage]
-  );
-  // Sempre que o filtro muda (busca, status, etc.) e a página atual deixa
-  // de existir (ex: filtro reduziu o total), volta pra página 1.
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(1);
-  }, [totalPages, currentPage]);
   const { user } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const navigate = useNavigate();
+  const {
+    alunoIdsAguardandoMinhaAutorizacao,
+    alunoIdsComPendente,
+  } = useTransferenciasPendentes();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   // Ao clicar no card/linha do aluno, expande o painel por cima da tela
   // (ver AlunoExpandModal.tsx) em vez de navegar pra /alunos/:id.
   const [expandedAlunoId, setExpandedAlunoId] = useState<string | null>(null);
   const [delegarAlunoId, setDelegarAlunoId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState(filters.search || "");
+  // Estado LOCAL de busca/filtros (isolado por SCOPE_ID).
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string[]>(
-    filters.status || []
-  );
-  const [selectedSource, setSelectedSource] = useState<string[]>(
-    filters.source || []
-  );
-  const [dateFrom, setDateFrom] = useState<string>(
-    filters.dateFrom
-      ? new Date(filters.dateFrom).toISOString().split("T")[0]
-      : ""
-  );
-  const [dateTo, setDateTo] = useState<string>(
-    filters.dateTo ? new Date(filters.dateTo).toISOString().split("T")[0] : ""
-  );
-  // Filtro por responsável (igual Engajamento).
+  const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
+  const [selectedSource, setSelectedSource] = useState<string[]>([]);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   // "" = Todos | "__sem__" = sem responsável | uuid = colaborador
-  const [selectedColaborador, setSelectedColaborador] = useState<string>(
-    filters.assignedTo || ""
-  );
+  const [selectedColaborador, setSelectedColaborador] = useState<string>("");
   const [importProgress, setImportProgress] = useState<{
     done: number;
     total: number;
   } | null>(null);
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
 
   const statuses = [
     { value: "cadastrado", label: "Cadastrado" },
@@ -124,16 +93,15 @@ const Alunos: React.FC = () => {
     { value: "outro", label: "Outro" },
   ];
 
-  // Debounce: só reprocessa o filtro (que roda sobre TODOS os alunos, não
-  // só a página atual) 300ms depois que a pessoa parar de digitar, em vez
-  // de re-filtrar/re-renderizar a cada tecla.
+  // Debounce local: só atualiza o termo usado no filtro 300ms após parar
+  // de digitar (não toca no contexto global).
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
-      setFilters({ ...filters, search: value });
+      setDebouncedSearch(value);
     }, 300);
   };
 
@@ -141,60 +109,112 @@ const Alunos: React.FC = () => {
     const newStatus = selectedStatus.includes(status)
       ? selectedStatus.filter((s) => s !== status)
       : [...selectedStatus, status];
-
     setSelectedStatus(newStatus);
-    setFilters({
-      ...filters,
-      status: newStatus.length > 0 ? (newStatus as AlunoStatus[]) : undefined,
-    });
+    setCurrentPage(1);
   };
 
   const handleSourceFilter = (source: string) => {
     const newSource = selectedSource.includes(source)
       ? selectedSource.filter((s) => s !== source)
       : [...selectedSource, source];
-
     setSelectedSource(newSource);
-    setFilters({
-      ...filters,
-      source: newSource.length > 0 ? (newSource as CanalContato[]) : undefined,
-    });
+    setCurrentPage(1);
   };
 
   const handleDateFromChange = (value: string) => {
     setDateFrom(value);
-    setFilters({
-      ...filters,
-      dateFrom: value ? new Date(value) : undefined,
-    });
+    setCurrentPage(1);
   };
 
   const handleDateToChange = (value: string) => {
     setDateTo(value);
-    setFilters({
-      ...filters,
-      dateTo: value ? new Date(value) : undefined,
-    });
+    setCurrentPage(1);
   };
 
   const handleColaboradorFilter = (colaboradorId: string) => {
     setSelectedColaborador(colaboradorId);
     setCurrentPage(1);
-    setFilters({
-      ...filters,
-      assignedTo: colaboradorId || undefined,
-    });
   };
 
   const handleClearFilters = () => {
     setSearchTerm("");
+    setDebouncedSearch("");
     setSelectedStatus([]);
     setSelectedSource([]);
     setSelectedColaborador("");
     setDateFrom("");
     setDateTo("");
-    setFilters({});
+    setCurrentPage(1);
   };
+
+  // Filtro 100% local a partir da lista completa do contexto.
+  // Scope: rematricula-alunos — isolado de outras sub-abas.
+  const filteredAlunos = useMemo(() => {
+    return alunos.filter((aluno) => {
+      if (aluno.area !== "rematricula") return false;
+
+      if (debouncedSearch) {
+        const searchLower = debouncedSearch.toLowerCase();
+        const matchesSearch =
+          aluno.name.toLowerCase().includes(searchLower) ||
+          aluno.email.toLowerCase().includes(searchLower) ||
+          aluno.curso?.toLowerCase().includes(searchLower) ||
+          aluno.ra?.toLowerCase().includes(searchLower) ||
+          aluno.phone.includes(debouncedSearch);
+        if (!matchesSearch) return false;
+      }
+
+      if (selectedStatus.length > 0) {
+        if (!selectedStatus.includes(aluno.status)) return false;
+      }
+
+      if (selectedSource.length > 0) {
+        if (!selectedSource.includes(aluno.source)) return false;
+      }
+
+      if (dateFrom) {
+        if (new Date(aluno.createdAt) < new Date(dateFrom)) return false;
+      }
+
+      if (dateTo) {
+        const to = new Date(dateTo);
+        to.setHours(23, 59, 59, 999);
+        if (new Date(aluno.createdAt) > to) return false;
+      }
+
+      if (selectedColaborador) {
+        if (selectedColaborador === "__sem__") {
+          if (aluno.assignedTo) return false;
+        } else if (aluno.assignedTo !== selectedColaborador) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [
+    alunos,
+    debouncedSearch,
+    selectedStatus,
+    selectedSource,
+    dateFrom,
+    dateTo,
+    selectedColaborador,
+  ]);
+
+  // Paginação client-side (10 por página).
+  const totalPages = Math.max(1, Math.ceil(filteredAlunos.length / PAGE_SIZE));
+  const paginatedAlunos = useMemo(
+    () =>
+      filteredAlunos.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+      ),
+    [filteredAlunos, currentPage]
+  );
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [totalPages, currentPage]);
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -353,10 +373,11 @@ const Alunos: React.FC = () => {
       {/* Toolbar */}
       <div className="leads-toolbar">
         <SearchBox
-        placeholder="Buscar por nome, email, RA, curso..."
-        value={searchTerm}
-        onChange={handleSearch}
-      />
+          id={`search-${SCOPE_ID}`}
+          placeholder="Buscar por nome, email, RA, curso..."
+          value={searchTerm}
+          onChange={handleSearch}
+        />
         <button
           className={`btn btn-secondary ${showFilters ? "active" : ""}`}
           onClick={() => setShowFilters(!showFilters)}
@@ -534,6 +555,10 @@ const Alunos: React.FC = () => {
                 onAssumir={() => handleAssumir(aluno.id)}
                 onDelegar={() => setDelegarAlunoId(aluno.id)}
                 onDelete={() => handleDelete(aluno.id, aluno.name)}
+                aguardaMinhaAutorizacao={alunoIdsAguardandoMinhaAutorizacao.has(
+                  aluno.id
+                )}
+                temTransferenciaPendente={alunoIdsComPendente.has(aluno.id)}
               />
             );
           })}

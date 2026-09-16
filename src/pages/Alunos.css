@@ -68,6 +68,8 @@
   border: none;
   padding: 0.625rem 0;
   flex: 1;
+  background: transparent !important;
+  color: #1a1a1a !important;
 }
 
 .search-box input:focus {
@@ -123,7 +125,7 @@
 
 /* ---- Painel de filtros avançados ---- */
 .filters-panel {
-  background-color: #fff;
+  background-color: var(--surface);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   padding: 1.25rem 1.5rem;
@@ -187,7 +189,7 @@
   border-radius: var(--radius-md);
   font-size: 0.875rem;
   color: var(--text-primary);
-  background-color: #fff;
+  background-color: var(--surface);
 }
 
 .filter-actions {
@@ -208,7 +210,7 @@
 
 /* ---- Tabela (modo Lista) ---- */
 .leads-table-container {
-  background-color: #fff;
+  background-color: var(--surface);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   overflow-x: auto;

@@ -10,6 +10,7 @@ import {
 import { conferirLembreteBoleto } from "../services/calendarioGeralService";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
+import { playNotificationSound } from "../utils/notificationSound";
 import { NotificacoesContext } from "./notificacoes-context";
 
 interface NotificacoesProviderProps {
@@ -67,6 +68,7 @@ export const NotificacoesProvider: React.FC<NotificacoesProviderProps> = ({
           filter: `para_user_id=eq.${user.id}`,
         },
         (payload) => {
+          playNotificationSound();
           setNotificacoes((prev) =>
             [mapNotificacaoRow(payload.new), ...prev].slice(0, 50)
           );

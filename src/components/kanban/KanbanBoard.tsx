@@ -20,11 +20,10 @@ interface KanbanBoardProps {
    */
   onlyMine?: boolean;
   /**
-   * Busca LOCAL, aplicada só neste board (nome/e-mail/telefone/RA) por
-   * cima do que já vem filtrado pelo contexto global (useAlunos).
-   * Propositalmente não usa o `filters`/`setFilters` do AlunosContext:
-   * isso mantém essa busca isolada da aba (não afeta Alunos, Funil geral,
-   * Risco de Evasão etc, mesmo estando no mesmo funil/área).
+   * Busca LOCAL, aplicada só neste board (nome/e-mail/telefone/RA).
+   * Isolada de propósito: não usa `filters`/`setFilters` do AlunosContext,
+   * para que a busca de uma sub-aba (ex.: Meus Contatos) nunca interfira
+   * em outra (Alunos, Engajamento, Risco de Evasão etc.).
    */
   searchTerm?: string;
 }
@@ -34,7 +33,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onlyMine = false,
   searchTerm,
 }) => {
-  const { filteredAlunos, updateAluno, statusResumo, isAdmin } = useAlunos();
+  // Lista completa (`alunos`), nunca `filteredAlunos` do contexto:
+  // filtros/busca de outras abas não podem contaminar este board.
+  const { alunos, updateAluno, statusResumo, isAdmin } = useAlunos();
   const { user } = useAuth();
   const { showToast } = useToast();
   const boardWrapperRef = useRef<HTMLDivElement>(null);
@@ -86,12 +87,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   // referência de array entre renders — e o React.memo de KanbanColumn
   // (abaixo) passa a realmente evitar o re-render dela.
   const alunosPorStatus = useMemo(() => {
-    const mapa = new Map<AlunoStatus, typeof filteredAlunos>();
+    const mapa = new Map<AlunoStatus, typeof alunos>();
     for (const status of statuses) mapa.set(status, []);
 
     const termo = searchTerm?.trim().toLowerCase();
 
-    for (const aluno of filteredAlunos) {
+    for (const aluno of alunos) {
       if (aluno.area !== area) continue;
       if (onlyMine && aluno.assignedTo !== user?.id) continue;
       if (termo) {
@@ -102,7 +103,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
 
     return mapa;
-  }, [filteredAlunos, area, statuses, onlyMine, user, searchTerm]);
+  }, [alunos, area, statuses, onlyMine, user, searchTerm]);
 
   const getAlunosByStatus = useCallback(
     (status: AlunoStatus) => alunosPorStatus.get(status) ?? [],

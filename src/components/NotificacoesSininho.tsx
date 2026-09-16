@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, MessageSquare, Mail, CheckCheck } from "lucide-react";
+import { Bell, MessageSquare, Mail, CheckCheck, Volume2, VolumeX } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNotificacoes } from "../hooks/useNotificacoes";
 import { Notificacao } from "../types";
+import {
+  isSomNotificacaoMudo,
+  setSomNotificacaoMudo,
+} from "../utils/notificationSound";
 import "./NotificacoesSininho.css";
 
 const iconePorTipo = (tipo: Notificacao["tipo"]) => {
@@ -22,6 +26,7 @@ const NotificacoesSininho: React.FC = () => {
   const { notificacoes, naoLidas, marcarLida, marcarTodasLidas } =
     useNotificacoes();
   const [isOpen, setIsOpen] = useState(false);
+  const [somMudo, setSomMudo] = useState(() => isSomNotificacaoMudo());
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +61,14 @@ const NotificacoesSininho: React.FC = () => {
     }
   };
 
+  const alternarSom = () => {
+    setSomMudo((atual) => {
+      const novo = !atual;
+      setSomNotificacaoMudo(novo);
+      return novo;
+    });
+  };
+
   const visiveis = notificacoes.slice(0, 20);
 
   return (
@@ -79,15 +92,25 @@ const NotificacoesSininho: React.FC = () => {
         <div className="sininho-dropdown" role="dialog">
           <div className="sininho-header">
             <span>Notificações</span>
-            {naoLidas > 0 && (
+            <div className="sininho-header-acoes">
               <button
-                className="sininho-marcar-todas"
-                onClick={() => marcarTodasLidas()}
+                className="sininho-som-toggle"
+                onClick={alternarSom}
+                title={somMudo ? "Ativar som de notificação" : "Silenciar som de notificação"}
+                aria-label={somMudo ? "Ativar som de notificação" : "Silenciar som de notificação"}
               >
-                <CheckCheck size={14} />
-                Marcar todas como lidas
+                {somMudo ? <VolumeX size={14} /> : <Volume2 size={14} />}
               </button>
-            )}
+              {naoLidas > 0 && (
+                <button
+                  className="sininho-marcar-todas"
+                  onClick={() => marcarTodasLidas()}
+                >
+                  <CheckCheck size={14} />
+                  Marcar todas como lidas
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="sininho-lista">

@@ -14,6 +14,61 @@ import {
 const AREAS: Area[] = ["rematricula", "retencao", "engajamento"];
 
 // ---------------------------------------------------------------------
+// Tipos auxiliares para os retornos das RPCs de métricas.
+//
+// O client do Supabase (src/lib/supabase.ts) não é criado com o generic
+// `Database`, então o TS não consegue inferir o formato das linhas
+// retornadas por `.rpc(...)` quando encadeado com `.select()`/`.eq()`/
+// `.order()`. Tipamos manualmente aqui (refletindo as funções SQL em
+// database/020_isolamento_completo_por_polo.sql) só para dar tipo aos
+// dados antes de mapear — não muda nada em runtime.
+// ---------------------------------------------------------------------
+interface PipelineAreaPoloRow {
+  status: string;
+  total: number | string;
+  total_valor_pendente: number | string;
+}
+
+interface MetricasColaboradorPoloRow {
+  colaborador_id: string;
+  colaborador_nome: string;
+  total_alunos: number | string;
+  sucesso: number | string;
+  encerrados_sem_sucesso: number | string;
+  valor_recuperado: number | string;
+  valor_total_carteira: number | string;
+  total_interacoes: number | string;
+}
+
+interface MetricasCanalPoloRow {
+  canal_contato: string;
+  total: number | string;
+  sucesso: number | string;
+  taxa_conversao: number | string;
+}
+
+interface MetricasCanalPoloComAreaRow extends MetricasCanalPoloRow {
+  area: string;
+}
+
+interface OverviewPoloRow {
+  area: string;
+  total: number | string;
+}
+
+interface AlertaPoloRow {
+  area: string;
+  travados: number | string;
+}
+
+// Normaliza o retorno de `.rpc(...)` para sempre virar um array, já que o
+// tipo inferido hoje é uma união `objeto | objeto[]` (ver comentário acima).
+function toArray<T>(data: unknown): T[] {
+  if (!data) return [];
+  return Array.isArray(data) ? (data as T[]) : [data as T];
+}
+
+// ---------------------------------------------------------------------
 // Pipeline por status — usado no gráfico de funil de cada área.
 // ---------------------------------------------------------------------
 export async function getPipelineResumo(
@@ -33,7 +88,7 @@ export async function getPipelineResumo(
     }
 
     return {
-      data: (data || []).map((row) => ({
+      data: toArray<PipelineAreaPoloRow>(data).map((row) => ({
         status: row.status as AlunoStatus,
         total: Number(row.total) || 0,
         totalValorPendente: Number(row.total_valor_pendente) || 0,
@@ -134,7 +189,7 @@ export async function getMetricasColaboradores(
     }
 
     return {
-      data: (data || []).map((row) => {
+      data: toArray<MetricasColaboradorPoloRow>(data).map((row) => {
         const totalAlunos = Number(row.total_alunos) || 0;
         const sucesso = Number(row.sucesso) || 0;
         return {
@@ -174,7 +229,7 @@ export async function getMetricasCanais(
     }
 
     return {
-      data: (data || []).map((row) => ({
+      data: toArray<MetricasCanalPoloRow>(data).map((row) => ({
         canal: row.canal_contato,
         total: Number(row.total) || 0,
         sucesso: Number(row.sucesso) || 0,
@@ -210,7 +265,7 @@ export async function getMetricasCanaisCruzado(): Promise<{
       engajamento: [],
     };
 
-    for (const row of data || []) {
+    for (const row of toArray<MetricasCanalPoloComAreaRow>(data)) {
       const area = row.area as Area;
       if (!resultado[area]) continue;
       resultado[area].push({
@@ -251,7 +306,7 @@ export async function getOverviewGeral(): Promise<{
 
     const porArea: Record<Area, number> = { rematricula: 0, retencao: 0, engajamento: 0 };
     let totalGeral = 0;
-    for (const row of overviewRes.data || []) {
+    for (const row of toArray<OverviewPoloRow>(overviewRes.data)) {
       const area = row.area as Area;
       const total = Number(row.total) || 0;
       if (AREAS.includes(area)) porArea[area] = total;
@@ -261,7 +316,7 @@ export async function getOverviewGeral(): Promise<{
     const alertasPorArea: Record<Area, number> = { rematricula: 0, retencao: 0, engajamento: 0 };
     let totalAlertas = 0;
     if (!alertasRes.error) {
-      for (const row of alertasRes.data || []) {
+      for (const row of toArray<AlertaPoloRow>(alertasRes.data)) {
         const area = row.area as Area;
         const travados = Number(row.travados) || 0;
         if (AREAS.includes(area)) alertasPorArea[area] = travados;

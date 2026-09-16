@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, Search, Users, Loader2, Inbox } from "lucide-react";
 import { useAlunos } from "../hooks/useAlunos";
+import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { Aluno, Usuario, SolicitacaoTransferencia } from "../types";
 import { buscarAlunosPolo } from "../services/alunosService";
@@ -9,6 +10,7 @@ import {
   listarSolicitacoesTransferencia,
   decidirSolicitacaoTransferencia,
 } from "../services/transferenciasService";
+import { useTransferenciasPendentes } from "../hooks/useTransferenciasPendentes";
 import "./Transferencias.css";
 
 type Aba = "solicitacoes" | "alunos" | "colaboradores";
@@ -28,7 +30,9 @@ const AREA_LABEL: Record<Aluno["area"], string> = {
  */
 const Transferencias: React.FC = () => {
   const { setores, colaboradores, updateAluno, delegarAluno } = useAlunos();
+  const { user } = useAuth();
   const { showToast } = useToast();
+  const { refresh: refreshPendentesGlobais } = useTransferenciasPendentes();
   const [aba, setAba] = useState<Aba>("solicitacoes");
 
   // ---- Aba Solicitações ----
@@ -57,6 +61,7 @@ const Transferencias: React.FC = () => {
     else {
       showToast(aprovar ? "Transferência aprovada e aplicada." : "Solicitação recusada.", aprovar ? "success" : "info");
       await carregarSolicitacoes();
+      await refreshPendentesGlobais();
     }
     setDecidindoId(null);
   };
@@ -157,10 +162,18 @@ const Transferencias: React.FC = () => {
     setCarregandoUsuarios(true);
     getUsuarios().then(({ usuarios: lista, error }) => {
       if (error) showToast(error, "error");
-      setUsuarios(lista.filter((u) => u.role === "colaborador" && u.status === "aprovado"));
+      // Supervisor: só colaboradores do próprio polo.
+      // Admin: todos os polos.
+      setUsuarios(
+        lista.filter((u) => {
+          if (u.role !== "colaborador" || u.status !== "aprovado") return false;
+          if (user?.role === "admin") return true;
+          return !!user?.poloId && u.poloId === user.poloId;
+        })
+      );
       setCarregandoUsuarios(false);
     });
-  }, [aba, showToast]);
+  }, [aba, showToast, user?.role, user?.poloId]);
 
   const alterarSetorColaborador = async (usuario: Usuario, setorId: string) => {
     const anterior = usuario.setorId;

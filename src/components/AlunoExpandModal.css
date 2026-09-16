@@ -359,6 +359,7 @@
   border-radius: var(--radius-md);
   font-family: inherit;
   font-size: 0.875rem;
+  background-color: var(--bg-elevated);
   color: var(--text-primary);
   transition: var(--transition);
 }
@@ -429,7 +430,7 @@
 
 .anotacao-entrada {
   padding: 0.625rem 0.75rem;
-  background-color: var(--gray-50);
+  background-color: var(--bg-elevated);
   border-radius: var(--radius-md);
   border-left: 3px solid var(--primary);
 }

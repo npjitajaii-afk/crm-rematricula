@@ -15,7 +15,7 @@
   --danger: #ef4444;
   --info: #4C5FC7;
   
-  /* Cores neutras */
+  /* Cores neutras (light) */
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
@@ -30,8 +30,11 @@
   /* Background e texto */
   --bg-primary: #ffffff;
   --bg-secondary: var(--gray-50);
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
   --text-primary: var(--gray-900);
   --text-secondary: var(--gray-600);
+  --border-color: var(--gray-200);
   
   /* Sombras */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -47,6 +50,7 @@
   
   /* Transições */
   --transition: all 0.2s ease-in-out;
+  color-scheme: light;
   
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -54,10 +58,53 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Tema escuro — ativado via data-theme="dark" no <html> */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --primary: #6B7AE8;
+  --primary-dark: #4C5FC7;
+  --primary-light: #A0A9F0;
+
+  --secondary: #D48AB5;
+  --secondary-dark: #C1729F;
+
+  --ink: #f3f4f6;
+  --ink-light: #d1d5db;
+
+  --gray-50: #18181b;
+  --gray-100: #27272a;
+  --gray-200: #3f3f46;
+  --gray-300: #52525b;
+  --gray-400: #71717a;
+  --gray-500: #a1a1aa;
+  --gray-600: #d4d4d8;
+  --gray-700: #e4e4e7;
+  --gray-800: #f4f4f5;
+  --gray-900: #fafafa;
+
+  --bg-primary: #0f0f12;
+  --bg-secondary: #18181b;
+  --bg-elevated: #1c1c21;
+  --surface: #1c1c21;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --border-color: #3f3f46;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.55), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
 }
 
 body {
@@ -72,10 +119,28 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  transition: background-color 0.35s ease, color 0.35s ease;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* Transição suave ao trocar claro/escuro */
+.layout,
+.rail,
+.topbar,
+.content,
+.card,
+.btn,
+input,
+textarea,
+select,
+.aluno-expand-modal,
+.toast,
+.search-box {
+  transition: background-color 0.35s ease, color 0.35s ease,
+    border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
 /* Scrollbar personalizada */
@@ -216,16 +281,33 @@ button:disabled {
 }
 
 /* Inputs */
-input, textarea, select {
+input, textarea {
   font-family: inherit;
   font-size: 0.875rem;
   padding: 0.625rem 0.875rem;
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-md);
-  background-color: white;
+  background-color: var(--bg-elevated);
   color: var(--text-primary);
   transition: var(--transition);
   width: 100%;
+}
+
+select {
+  font-family: inherit;
+  font-size: 0.875rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+  color: var(--text-primary);
+  transition: var(--transition);
+  width: 100%;
+}
+
+select option {
+  background-color: var(--surface);
+  color: var(--text-primary);
 }
 
 input:focus, textarea:focus, select:focus {
@@ -246,7 +328,7 @@ textarea {
 
 /* Cards */
 .card {
-  background-color: white;
+  background-color: var(--surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   padding: 1.5rem;

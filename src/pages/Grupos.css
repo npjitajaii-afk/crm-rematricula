@@ -44,6 +44,8 @@
   border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-family: inherit;
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .grupos-select {
@@ -52,7 +54,12 @@
   border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-family: inherit;
-  background: white;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.grupos-select option {
+  background-color: var(--bg-elevated);
   color: var(--text-primary);
 }
 
@@ -83,10 +90,11 @@
 }
 
 .grupo-card {
-  background: white;
+  background: var(--bg-primary);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
+  color: var(--text-primary);
 }
 
 .grupo-card-header {
@@ -101,7 +109,7 @@
   cursor: pointer;
   font-family: inherit;
   text-align: left;
-  color: var(--gray-400);
+  color: var(--text-secondary);
   transition: var(--transition);
 }
 
@@ -264,4 +272,48 @@
   .grupo-aluno-detalhe {
     text-align: left;
   }
+}
+
+/* ── Dark mode — força contraste na aba Grupos ───────────────────── */
+html[data-theme="dark"] .grupo-card,
+html.dark .grupo-card {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .grupo-card-header,
+html.dark .grupo-card-header {
+  color: var(--text-secondary) !important;
+}
+
+html[data-theme="dark"] .grupo-card-header:hover,
+html[data-theme="dark"] .grupo-card.aberto .grupo-card-header,
+html.dark .grupo-card-header:hover,
+html.dark .grupo-card.aberto .grupo-card-header {
+  background: var(--gray-100) !important;
+}
+
+html[data-theme="dark"] .grupo-aluno-nome,
+html.dark .grupo-aluno-nome {
+  color: var(--text-primary) !important;
+}
+
+html[data-theme="dark"] .grupo-aluno-detalhe,
+html.dark .grupo-aluno-detalhe {
+  color: var(--text-secondary) !important;
+}
+
+html[data-theme="dark"] .grupos-select,
+html[data-theme="dark"] .grupos-busca,
+html.dark .grupos-select,
+html.dark .grupos-busca {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--gray-300) !important;
+}
+
+html[data-theme="dark"] .grupos-select option,
+html.dark .grupos-select option {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
 }

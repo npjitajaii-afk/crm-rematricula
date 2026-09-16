@@ -311,7 +311,8 @@
   text-align: left;
   font-size: 0.875rem;
   font-weight: 500;
-  background-color: white;
+  background-color: var(--surface);
+  color: var(--text-primary);
   transition: var(--transition);
   cursor: pointer;
 }

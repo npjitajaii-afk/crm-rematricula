@@ -1,5 +1,5 @@
 .lead-card {
-  background-color: white;
+  background-color: var(--surface);
   border-radius: var(--radius-md);
   padding: 1rem;
   box-shadow: var(--shadow-sm);
@@ -381,4 +381,67 @@
   background: #ede9fe;
   border-radius: 999px;
   width: fit-content;
+}
+
+/* ---- Transferência pendente / aguardando autorização ---- */
+
+.lead-card--transf-acao {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
+  animation: lead-transf-pulse 1.6s ease-in-out infinite;
+}
+
+.lead-card--transf-pendente {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 40%);
+}
+
+@keyframes lead-transf-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.55);
+  }
+}
+
+.lead-transf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.lead-transf-badge--acao {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fbbf24;
+}
+
+.lead-transf-badge--pendente {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+.lead-transf-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
 }

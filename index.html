@@ -1,10 +1,26 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bask CRM</title>
+    <script>
+      (function () {
+        try {
+          var p = localStorage.getItem("bask-crm-theme") || "system";
+          var dark =
+            p === "dark" ||
+            (p === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.setAttribute(
+            "data-theme",
+            dark ? "dark" : "light"
+          );
+          document.documentElement.classList.add(dark ? "dark" : "light");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -16,9 +16,11 @@
   padding: 0.875rem 1rem;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
-  background-color: white;
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
   font-size: 0.875rem;
   animation: toastIn 0.2s ease-out;
+  border: 1px solid var(--gray-200);
 }
 
 .toast span {

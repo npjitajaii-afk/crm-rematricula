@@ -8,7 +8,6 @@ import { Plus, Sparkles, MoveHorizontal, Upload, Trash2, Filter, Download } from
 import SearchBox from "../components/SearchBox";
 import { AREA_CONFIG } from "../config/areas";
 import { getStatusLabel, getSourceLabel } from "../utils/formatters";
-import { AlunoStatus } from "../types";
 import AlunoSwipeRow from "../components/AlunoSwipeRow";
 import EngajamentoTabs from "../components/EngajamentoTabs";
 import AlunoExpandModal from "../components/AlunoExpandModal";
@@ -42,11 +41,14 @@ const sources = [
  * AlunoSwipeRow) — o Kanban desta área fica só em "Meus Contatos"
  * (ver MeusContatosEngajamento.tsx).
  */
+/** Escopo único desta sub-aba (Engajamento → Alunos). Filtros e busca
+ *  ficam 100% locais — não gravam em `filters` do AlunosContext e portanto
+ *  não interferem em Rematrícula, Meus Contatos, Retenção etc. */
+const SCOPE_ID = "engajamento-alunos";
+
 const Engajamento: React.FC = () => {
   const {
-    filteredAlunos: filteredAlunosTodasAreas,
-    filters,
-    setFilters,
+    alunos,
     importAlunosEngajamento,
     deleteAluno,
     deleteAlunosBulk,
@@ -56,14 +58,106 @@ const Engajamento: React.FC = () => {
     setores,
   } = useAlunos();
 
-  const filteredAlunos = filteredAlunosTodasAreas.filter(
-    (aluno) => aluno.area === "engajamento"
-  );
-
-  // Correção de performance: mesma lógica aplicada em src/pages/Alunos.tsx —
-  // paginação client-side de 10 em 10, sem tocar no resto do fluxo.
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
+  const navigate = useNavigate();
+  // Estado LOCAL de busca/filtros (isolado por SCOPE_ID).
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
+  // "" = Todos | "__sem__" = contatos sem responsável | uuid = colaborador
+  const [selectedColaborador, setSelectedColaborador] = useState<string>("");
+  const [selectedSetor, setSelectedSetor] = useState<string>("");
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
+  // Ao clicar no card/linha do aluno, expande o painel por cima da tela
+  // (ver AlunoExpandModal.tsx) em vez de navegar pra /alunos/:id.
+  const [expandedAlunoId, setExpandedAlunoId] = useState<string | null>(null);
+  const [delegarAlunoId, setDelegarAlunoId] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
+  /** Setor aplicado na importação; "" = sem setor */
+  const [importSetorId, setImportSetorId] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Debounce local: só atualiza o termo usado no filtro 300ms após parar
+  // de digitar (não toca no contexto global).
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(value);
+    }, 300);
+  };
+
+  const handleStatusFilter = (status: string) => {
+    const newStatus = selectedStatus.includes(status)
+      ? selectedStatus.filter((s) => s !== status)
+      : [...selectedStatus, status];
+    setSelectedStatus(newStatus);
+    setCurrentPage(1);
+  };
+
+  const handleColaboradorFilter = (colaboradorId: string) => {
+    setSelectedColaborador(colaboradorId);
+    setCurrentPage(1);
+  };
+
+  const handleSetorFilter = (setorId: string) => {
+    setSelectedSetor(setorId);
+    setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    setSelectedStatus([]);
+    setSelectedColaborador("");
+    setSelectedSetor("");
+    setCurrentPage(1);
+  };
+
+  // Filtro 100% local a partir da lista completa do contexto.
+  // Scope: engajamento-alunos — isolado de outras sub-abas.
+  const filteredAlunos = useMemo(() => {
+    return alunos.filter((aluno) => {
+      if (aluno.area !== "engajamento") return false;
+
+      if (debouncedSearch) {
+        const searchLower = debouncedSearch.toLowerCase();
+        const matchesSearch =
+          aluno.name.toLowerCase().includes(searchLower) ||
+          aluno.email.toLowerCase().includes(searchLower) ||
+          aluno.curso?.toLowerCase().includes(searchLower) ||
+          aluno.ra?.toLowerCase().includes(searchLower) ||
+          aluno.phone.includes(debouncedSearch);
+        if (!matchesSearch) return false;
+      }
+
+      if (selectedStatus.length > 0) {
+        if (!selectedStatus.includes(aluno.status)) return false;
+      }
+
+      if (selectedColaborador) {
+        if (selectedColaborador === "__sem__") {
+          if (aluno.assignedTo) return false;
+        } else if (aluno.assignedTo !== selectedColaborador) {
+          return false;
+        }
+      }
+
+      if (selectedSetor) {
+        if (aluno.setorId !== selectedSetor) return false;
+      }
+
+      return true;
+    });
+  }, [alunos, debouncedSearch, selectedStatus, selectedColaborador, selectedSetor]);
+
   const totalPages = Math.max(1, Math.ceil(filteredAlunos.length / PAGE_SIZE));
   const paginatedAlunos = useMemo(
     () =>
@@ -77,84 +171,6 @@ const Engajamento: React.FC = () => {
     if (currentPage > totalPages) setCurrentPage(1);
   }, [totalPages, currentPage]);
 
-  const { user } = useAuth();
-  const { showToast } = useToast();
-  const { confirm } = useConfirm();
-  const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState(filters.search || "");
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string[]>(
-    filters.status || []
-  );
-  // Filtro por responsável (assignedTo).
-  // "" = Todos | "__sem__" = contatos sem responsável | uuid = colaborador
-  const [selectedColaborador, setSelectedColaborador] = useState<string>(
-    filters.assignedTo || ""
-  );
-  const [selectedSetor, setSelectedSetor] = useState<string>(
-    filters.setorId || ""
-  );
-  const [openRowId, setOpenRowId] = useState<string | null>(null);
-  // Ao clicar no card/linha do aluno, expande o painel por cima da tela
-  // (ver AlunoExpandModal.tsx) em vez de navegar pra /alunos/:id.
-  const [expandedAlunoId, setExpandedAlunoId] = useState<string | null>(null);
-  const [delegarAlunoId, setDelegarAlunoId] = useState<string | null>(null);
-  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
-  /** Setor aplicado na importação; "" = sem setor */
-  const [importSetorId, setImportSetorId] = useState<string>("");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  // Debounce: mesma lógica de Alunos.tsx — só reaplica o filtro global
-  // 300ms depois que a pessoa parar de digitar.
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleSearch = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      setFilters({ ...filters, search: value });
-    }, 300);
-  };
-
-  const handleStatusFilter = (status: string) => {
-    const newStatus = selectedStatus.includes(status)
-      ? selectedStatus.filter((s) => s !== status)
-      : [...selectedStatus, status];
-    setSelectedStatus(newStatus);
-    setCurrentPage(1);
-    setFilters({
-      ...filters,
-      status: newStatus.length > 0 ? (newStatus as AlunoStatus[]) : undefined,
-    });
-  };
-
-  const handleColaboradorFilter = (colaboradorId: string) => {
-    setSelectedColaborador(colaboradorId);
-    setCurrentPage(1);
-    setFilters({
-      ...filters,
-      assignedTo: colaboradorId || undefined,
-    });
-  };
-
-  const handleSetorFilter = (setorId: string) => {
-    setSelectedSetor(setorId);
-    setCurrentPage(1);
-    setFilters({
-      ...filters,
-      setorId: setorId || undefined,
-    });
-  };
-
-  const handleClearFilters = () => {
-    setSearchTerm("");
-    setSelectedStatus([]);
-    setSelectedColaborador("");
-    setSelectedSetor("");
-    setCurrentPage(1);
-    setFilters({});
-  };
-
   // Exporta só os contatos de Engajamento (já filtrados por status/colaborador/busca).
   const handleExport = async () => {
     try {
@@ -167,7 +183,7 @@ const Engajamento: React.FC = () => {
         Turno: aluno.turno || "",
         Status: statuses.find((s) => s.value === aluno.status)?.label || aluno.status,
         Canal: sources.find((s) => s.value === aluno.source)?.label || aluno.source,
-        Setor: aluno.setorNome || "",
+        Setor: (aluno.setorNome === "Geral" ? "Pendente" : aluno.setorNome) || "Pendente",
         Responsável:
           colaboradores.find((c) => c.id === aluno.assignedTo)?.name || "",
         "Valor Pendente": aluno.value || 0,
@@ -360,10 +376,10 @@ const Engajamento: React.FC = () => {
               title="Setor dos contatos importados"
               aria-label="Setor da importação"
             >
-              <option value="">Importar sem setor</option>
+              <option value="">Importar como Pendente (sem setor)</option>
               {(setores || [])
                 .filter((s) => {
-                  if (s.nome === "Geral") return false;
+                  if (s.nome === "Geral" || s.nome === "Pendente") return false;
                   if (user?.poloId) return s.poloId === user.poloId;
                   return true;
                 })
@@ -379,6 +395,7 @@ const Engajamento: React.FC = () => {
 
       <div className="leads-toolbar">
         <SearchBox
+          id={`search-${SCOPE_ID}`}
           placeholder="Buscar por nome, email, RA, curso..."
           value={searchTerm}
           onChange={handleSearch}

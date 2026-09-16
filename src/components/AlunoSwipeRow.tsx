@@ -11,6 +11,7 @@ import {
   UserPlus,
   Users,
   Link2,
+  ArrowLeftRight,
 } from "lucide-react";
 import { formatCurrency, formatDate, getStatusColor } from "../utils/formatters";
 
@@ -38,6 +39,13 @@ interface AlunoSwipeRowProps {
   onAssumir: () => void;
   onDelegar?: () => void;
   onDelete: () => void;
+  /**
+   * Há pedido de transferência aguardando autorização do responsável
+   * atual (usuário logado). Card/linha pisca e mostra badge "1".
+   */
+  aguardaMinhaAutorizacao?: boolean;
+  /** Há qualquer solicitação de transferência pendente neste contato. */
+  temTransferenciaPendente?: boolean;
 }
 
 // Largura de cada botão de ação revelado ao arrastar a linha pro lado
@@ -66,6 +74,8 @@ const AlunoSwipeRow: React.FC<AlunoSwipeRowProps> = ({
   onAssumir,
   onDelegar,
   onDelete,
+  aguardaMinhaAutorizacao = false,
+  temTransferenciaPendente = false,
 }) => {
   const actionsCount =
     1 /* ver */ + (podeEditar ? 1 : 0) + (podeAssumir ? 1 : 0) + (podeDelegar ? 1 : 0) + (podeEditar ? 1 : 0);
@@ -199,13 +209,42 @@ const AlunoSwipeRow: React.FC<AlunoSwipeRowProps> = ({
               contato, com ou sem responsável — assim o nome fica sempre
               na mesma posição, linha após linha. A ação de assumir/
               delegar (quando existe) vai numa segunda linha, abaixo. */}
-          <div className="aluno-row-info">
+          <div
+            className={[
+              "aluno-row-info",
+              aguardaMinhaAutorizacao ? "aluno-row-info--transf-acao" : "",
+              temTransferenciaPendente && !aguardaMinhaAutorizacao
+                ? "aluno-row-info--transf-pendente"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
             <div className="aluno-row-main">
               <strong className="aluno-row-name">{aluno.name}</strong>
               {aluno.ra && <span className="aluno-row-ra">RA: {aluno.ra}</span>}
               {aluno.setorNome && (
                 <span className="aluno-row-setor" title="Setor">
-                  {aluno.setorNome}
+                  {aluno.setorNome === "Geral" ? "Pendente" : aluno.setorNome}
+                </span>
+              )}
+              {aguardaMinhaAutorizacao && (
+                <span
+                  className="aluno-row-transf-badge aluno-row-transf-badge--acao"
+                  title="Há um pedido de transferência aguardando sua autorização"
+                >
+                  <ArrowLeftRight size={11} />
+                  Transferência
+                  <span className="aluno-row-transf-count">1</span>
+                </span>
+              )}
+              {temTransferenciaPendente && !aguardaMinhaAutorizacao && (
+                <span
+                  className="aluno-row-transf-badge aluno-row-transf-badge--pendente"
+                  title="Há solicitação de transferência pendente neste contato"
+                >
+                  <ArrowLeftRight size={11} />
+                  Transf. pendente
                 </span>
               )}
               {aluno.matriculaVinculadaId && (

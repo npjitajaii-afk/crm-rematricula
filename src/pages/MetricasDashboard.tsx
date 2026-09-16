@@ -320,8 +320,8 @@ const AreaDashboard: React.FC<AreaDashboardProps> = ({ area }) => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 24 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--gray-200)" />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
-                <YAxis type="category" dataKey="label" width={140} tick={{ fontSize: 12 }} />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: "#fff" }} />
+                <YAxis type="category" dataKey="label" width={140} tick={{ fontSize: 12, fill: "#fff" }} />
                 <Tooltip
                   formatter={(value) => [Number(value), "Alunos"]}
                   contentStyle={{ fontSize: 13, borderRadius: 8 }}
@@ -465,8 +465,8 @@ const MetricasCruzadas: React.FC = () => {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ left: 0, right: 8 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--gray-200)" />
-              <XAxis dataKey="canal" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
+              <XAxis dataKey="canal" tick={{ fontSize: 12, fill: "#fff" }} />
+              <YAxis tick={{ fontSize: 12, fill: "#fff" }} tickFormatter={(v) => `${v}%`} />
               <Tooltip formatter={(value) => [`${Number(value)}%`, "Taxa de conversão"]} contentStyle={{ fontSize: 13, borderRadius: 8 }} />
               <Legend
                 formatter={(value) => AREA_CONFIG[value as Area]?.label ?? value}

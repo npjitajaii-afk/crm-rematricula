@@ -7,7 +7,7 @@
 .alunos-swipe-list {
   display: flex;
   flex-direction: column;
-  background-color: #fff;
+  background-color: var(--surface);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -86,11 +86,11 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.875rem 1.25rem;
-  background-color: #fff;
+  background-color: var(--surface);
   cursor: grab;
   touch-action: pan-y;
   user-select: none;
-  transition: transform 0.2s ease;
+  transition: background-color 0.15s ease, transform 0.2s ease;
   will-change: transform;
 }
 
@@ -101,6 +101,10 @@
 
 .aluno-row-content:hover {
   background-color: var(--gray-50);
+}
+
+[data-theme="dark"] .aluno-row-content:hover {
+  background-color: rgba(107, 122, 232, 0.14);
 }
 
 /* Linha com os dados do contato (nome, RA, curso, contato, status,
@@ -268,12 +272,75 @@
 .aluno-row-setor {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   margin-left: 0.35rem;
   padding: 0.1rem 0.45rem;
   font-size: 0.7rem;
   font-weight: 600;
-  color: #4c1d95;
-  background: #ede9fe;
+  color: #fff;
+  background: var(--primary);
   border-radius: 999px;
   white-space: nowrap;
+}
+
+/* ---- Transferência pendente / aguardando autorização (lista) ---- */
+
+.aluno-row-info--transf-acao {
+  border-left: 3px solid #f59e0b;
+  background: linear-gradient(90deg, #fffbeb 0%, transparent 55%);
+  animation: aluno-row-transf-pulse 1.6s ease-in-out infinite;
+}
+
+.aluno-row-info--transf-pendente {
+  border-left: 3px solid #3b82f6;
+  background: linear-gradient(90deg, #eff6ff 0%, transparent 55%);
+}
+
+@keyframes aluno-row-transf-pulse {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(245, 158, 11, 0.12);
+  }
+}
+
+.aluno-row-transf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+
+.aluno-row-transf-badge--acao {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fbbf24;
+}
+
+.aluno-row-transf-badge--pendente {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+
+.aluno-row-transf-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
 }

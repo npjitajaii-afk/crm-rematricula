@@ -346,23 +346,37 @@ const Colaboradores: React.FC = () => {
     [colaboradoresData, search]
   );
 
-  /** Setores ativos do polo do usuário (os 3 operacionais — sem Geral). */
+  /**
+   * Setores só fazem sentido quando o usuário tem o funil de engajamento liberado.
+   * Admin sempre pode ver (gerencia todos os polos). Supervisor/colaborador só se
+   * areasPermitidas incluir "engajamento". Polos sem engajamento não veem a
+   * separação por setores (Comercial / Contato / Jornada).
+   */
+  const temEngajamento =
+    user?.role === "admin" ||
+    !!user?.areasPermitidas?.includes("engajamento");
+
+  /** Setores ativos do polo do usuário (os operacionais — sem Geral). */
   const setoresAtivos = useMemo(
-    () =>
-      (setores || [])
+    () => {
+      if (!temEngajamento) return [];
+      return (setores || [])
         .filter((s) => {
-          if (s.nome === "Geral") return false;
-          // Admin/supervisor: só setores do próprio polo (evita Comercial x N polos)
+          if (s.nome === "Geral" || s.nome === "Pendente") return false;
+          // Só setores do próprio polo (isolamento por polo)
           if (user?.poloId) return s.poloId === user.poloId;
+          // Admin sem polo: vê todos (ou filtrar depois por polo se necessário)
           return true;
         })
         .slice()
-        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
-    [setores, user?.poloId]
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    },
+    [setores, user?.poloId, temEngajamento]
   );
 
-  /** Colaboradores agrupados por setor (só quem tem setor). */
+  /** Colaboradores agrupados por setor (só quem tem setor + engajamento liberado). */
   const gruposPorSetor = useMemo(() => {
+    if (!temEngajamento) return [];
     const grupos = setoresAtivos.map((s) => ({
       setorId: s.id,
       nome: s.nome,
@@ -374,7 +388,7 @@ const Colaboradores: React.FC = () => {
       }),
     }));
     return grupos;
-  }, [setoresAtivos, filteredColaboradores]);
+  }, [setoresAtivos, filteredColaboradores, temEngajamento]);
 
   const colabsSemSetor = useMemo(
     () =>
@@ -545,14 +559,24 @@ const Colaboradores: React.FC = () => {
         ))}
 
         {colabsSemSetor.length > 0 && (
-          <section className="colab-setor-card colab-setor-card--sem">
-            <div className="colab-setor-header">
-              <h2 className="colab-setor-title">Sem setor</h2>
-              <span className="colab-setor-count">
-                {colabsSemSetor.length}{" "}
-                {colabsSemSetor.length === 1 ? "colaborador" : "colaboradores"}
-              </span>
-            </div>
+          <section
+            className={
+              temEngajamento
+                ? "colab-setor-card colab-setor-card--sem"
+                : "colab-setor-card colab-setor-card--flat"
+            }
+          >
+            {/* Título "Sem setor" só quando o polo tem engajamento.
+                Sem engajamento: lista simples de colaboradores, sem agrupamento. */}
+            {temEngajamento && (
+              <div className="colab-setor-header">
+                <h2 className="colab-setor-title">Sem setor</h2>
+                <span className="colab-setor-count">
+                  {colabsSemSetor.length}{" "}
+                  {colabsSemSetor.length === 1 ? "colaborador" : "colaboradores"}
+                </span>
+              </div>
+            )}
             <div className="colab-list">
               {colabsSemSetor.map((colab) => {
                 const isOpen = expandedColaborador === colab.id;

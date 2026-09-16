@@ -10,6 +10,8 @@ import { ChecklistProvider } from "./contexts/ChecklistContext";
 import { WhatsappProvider } from "./contexts/WhatsappContext";
 import { TarefasEngajamentoProvider } from "./contexts/TarefasEngajamentoContext";
 import { AgendaEngajamentoProvider } from "./contexts/AgendaEngajamentoContext";
+import { TransferenciasPendentesProvider } from "./contexts/TransferenciasPendentesContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import PrivateRoute from "./components/PrivateRoute";
 import AreaRoute from "./components/AreaRoute";
 import AdminRoute from "./components/AdminRoute";
@@ -24,6 +26,7 @@ const Alunos              = lazy(() => import("./pages/Alunos"));
 const MeusContatos        = lazy(() => import("./pages/MeusContatos"));
 const RiscoEvasao         = lazy(() => import("./pages/RiscoEvasao"));
 const MetricasDashboard   = lazy(() => import("./pages/MetricasDashboard"));
+const Relatorio           = lazy(() => import("./pages/Relatorio"));
 const Grupos              = lazy(() => import("./pages/Grupos"));
 const Colaboradores       = lazy(() => import("./pages/Colaboradores"));
 const Transferencias      = lazy(() => import("./pages/Transferencias"));
@@ -58,7 +61,8 @@ function AuthPageLoader() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
       <ToastProvider>
         <ConfirmProvider>
           <AuthProvider>
@@ -68,6 +72,7 @@ function App() {
               <WhatsappProvider>
                 <TarefasEngajamentoProvider>
                 <AgendaEngajamentoProvider>
+                <TransferenciasPendentesProvider>
                   <Routes>
                     <Route
                       path="/login"
@@ -108,6 +113,7 @@ function App() {
                       <Route path="rematricula/calendario" element={<AreaRoute area="rematricula"><CalendarioGeral /></AreaRoute>} />
                       <Route path="rematricula/painel-tarefas" element={<AreaRoute area="rematricula"><PainelTarefasGeral /></AreaRoute>} />
                       <Route path="metricas" element={<GestorRoute><MetricasDashboard /></GestorRoute>} />
+                      <Route path="relatorio" element={<GestorRoute><Relatorio /></GestorRoute>} />
                       <Route path="grupos" element={<GestorRoute><Grupos /></GestorRoute>} />
                       <Route path="colaboradores" element={<GestorRoute><Colaboradores /></GestorRoute>} />
                       {/* Transferências: só gestor (admin/supervisor) E com funil de engajamento liberado.
@@ -152,6 +158,7 @@ function App() {
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
+                </TransferenciasPendentesProvider>
                 </AgendaEngajamentoProvider>
                 </TarefasEngajamentoProvider>
               </WhatsappProvider>
@@ -162,6 +169,7 @@ function App() {
         </ConfirmProvider>
       </ToastProvider>
     </BrowserRouter>
+    </ThemeProvider>
   );
 }
 

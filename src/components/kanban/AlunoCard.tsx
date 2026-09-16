@@ -22,12 +22,14 @@ import { useChecklist } from "../../hooks/useChecklist";
 import { useWhatsapp } from "../../hooks/useWhatsapp";
 import { useAgendaEngajamento } from "../../hooks/useAgendaEngajamento";
 import { useAuth } from "../../hooks/useAuth";
+import { useTransferenciasPendentes } from "../../hooks/useTransferenciasPendentes";
 import { isSameDay, startOfToday } from "date-fns";
 import EngajamentoChecklist from "./EngajamentoChecklist";
 import WhatsappBadge from "./WhatsappBadge";
 import AlunoExpandModal from "../AlunoExpandModal";
 import DelegarContatoModal from "../DelegarContatoModal";
 import NovaMatriculaModal from "../NovaMatriculaModal";
+import { ArrowLeftRight } from "lucide-react";
 import "./AlunoCard.css";
 
 interface AlunoCardProps {
@@ -61,6 +63,20 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
   const { resumoPorAluno } = useWhatsapp();
   const { compromissos } = useAgendaEngajamento();
   const { user } = useAuth();
+  const {
+    alunoIdsAguardandoMinhaAutorizacao,
+    alunoIdsComPendente,
+  } = useTransferenciasPendentes();
+
+  // Destaque forte: outro colaborador pediu para assumir este contato e
+  // o usuário logado é o responsável atual (precisa autorizar).
+  const aguardaMinhaAutorizacao = alunoIdsAguardandoMinhaAutorizacao.has(
+    aluno.id
+  );
+  // Destaque suave: há qualquer solicitação pendente (útil na visão de
+  // supervisor/admin na listagem de alunos).
+  const temTransferenciaPendente =
+    !aguardaMinhaAutorizacao && alunoIdsComPendente.has(aluno.id);
 
   // Checklist só existe (é criada automaticamente pelo banco) para
   // alunos da área "engajamento" — ver database/009_checklist_engajamento.sql.
@@ -143,7 +159,13 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
 
   return (
     <div
-      className="lead-card"
+      className={[
+        "lead-card",
+        aguardaMinhaAutorizacao ? "lead-card--transf-acao" : "",
+        temTransferenciaPendente ? "lead-card--transf-pendente" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       onClick={handleClick}
       onPointerDown={(e) => {
         if (expandedAlunoId) {
@@ -154,6 +176,25 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
       }}
       onPointerMove={handlePointerMoveCard}
     >
+      {aguardaMinhaAutorizacao && (
+        <span
+          className="lead-transf-badge lead-transf-badge--acao"
+          title="Há um pedido de transferência aguardando sua autorização"
+        >
+          <ArrowLeftRight size={12} />
+          Transferência
+          <span className="lead-transf-count">1</span>
+        </span>
+      )}
+      {temTransferenciaPendente && (
+        <span
+          className="lead-transf-badge lead-transf-badge--pendente"
+          title="Há solicitação de transferência pendente neste contato"
+        >
+          <ArrowLeftRight size={12} />
+          Transf. pendente
+        </span>
+      )}
       <div className="lead-card-header">
         <h4 className="lead-name">{aluno.name}</h4>
         {!aluno.matriculaVinculadaId && (
@@ -176,7 +217,7 @@ const AlunoCard: React.FC<AlunoCardProps> = React.memo(({ aluno, alerta }) => {
 
       {aluno.setorNome && (
         <span className="lead-setor-badge" title="Setor">
-          {aluno.setorNome}
+          {aluno.setorNome === "Geral" ? "Pendente" : aluno.setorNome}
         </span>
       )}
 

@@ -56,13 +56,14 @@
   flex-wrap: wrap;
   padding: 1rem 1.25rem;
   border-radius: 12px;
-  background: #fff;
+  background: var(--bg-elevated);
   border: 1px solid var(--gray-200);
+  color: var(--text-primary);
 }
 
 .usuario-card-pendente {
   border-color: var(--warning);
-  background: #fffbeb;
+  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, var(--bg-elevated));
 }
 
 .usuario-identity {
@@ -238,10 +239,10 @@
   gap: 0.5rem;
   max-width: 420px;
   padding: 0.55rem 0.85rem;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-elevated);
+  border: 1px solid var(--gray-200);
   border-radius: 10px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .usuarios-busca input {
@@ -250,7 +251,7 @@
   outline: none;
   font-size: 0.9rem;
   background: transparent;
-  color: #111827;
+  color: var(--text-primary);
 }
 
 .usuarios-polo-chips {
@@ -265,23 +266,23 @@
   gap: 0.35rem;
   padding: 0.4rem 0.75rem;
   border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  color: #4b5563;
+  border: 1px solid var(--gray-200);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
   font-size: 0.82rem;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .usuarios-polo-chip:hover {
-  border-color: #93c5fd;
-  color: #1d4ed8;
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .usuarios-polo-chip.active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 15%, var(--bg-elevated));
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -291,15 +292,15 @@
   justify-content: center;
   padding: 0 0.3rem;
   border-radius: 999px;
-  background: #f3f4f6;
+  background: var(--gray-100);
   font-size: 0.72rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .usuarios-polo-chip.active .usuarios-polo-chip-count {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: color-mix(in srgb, var(--primary) 20%, var(--bg-elevated));
+  color: var(--primary);
 }
 
 /* Cards por polo */
@@ -310,11 +311,12 @@
 }
 
 .usuarios-polo-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border: 1px solid var(--gray-200);
   border-radius: 14px;
   padding: 1rem 1.1rem 1.15rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
 }
 
 .usuarios-polo-card-header {
@@ -324,14 +326,14 @@
   gap: 0.75rem;
   margin-bottom: 0.85rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--gray-200);
 }
 
 .usuarios-polo-card-title {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .usuarios-polo-card-title h3 {
@@ -342,9 +344,9 @@
 
 .usuarios-polo-card-count {
   font-size: 0.8rem;
-  color: #6b7280;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  color: var(--text-secondary);
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
   border-radius: 999px;
   padding: 0.2rem 0.65rem;
 }
@@ -352,12 +354,12 @@
 .usuarios-section-count {
   margin-left: 0.35rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .usuarios-vazio {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   padding: 1rem 0;
 }

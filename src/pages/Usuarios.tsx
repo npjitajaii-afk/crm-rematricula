@@ -6,6 +6,7 @@ import {
   definirPoloUsuario,
   definirRoleUsuario,
   definirSetorUsuario,
+  apagarUsuario,
 } from "../services/usuariosService";
 import { Usuario, Area, UserRole } from "../types";
 import { AREA_CONFIG } from "../config/areas";
@@ -22,6 +23,7 @@ import {
   UserX,
   Search,
   MapPin,
+  Trash2,
 } from "lucide-react";
 import { formatDate } from "../utils/formatters";
 import "./Usuarios.css";
@@ -210,6 +212,34 @@ const Usuarios: React.FC = () => {
     } else {
       showToast(`${usuario.name} reativado(a)`, "success");
       setUsuarios((prev) => prev.map((u) => (u.id === usuario.id ? { ...u, status: "aprovado", areasPermitidas: areas } : u)));
+    }
+    setSavingId(null);
+  };
+
+  /** Apaga o usuário de forma permanente. Só admin (esta tela já é AdminRoute)
+   * e o banco bloqueia apagar a si mesmo ou outro admin. */
+  const apagar = async (usuario: Usuario) => {
+    if (usuario.role === "admin") {
+      showToast("Não é permitido apagar um administrador.", "error");
+      return;
+    }
+
+    const ok = await confirm(
+      `Apagar permanentemente ${usuario.name} (${usuario.email})? Esta ação não pode ser desfeita.`,
+      {
+        danger: true,
+        confirmLabel: "Apagar usuário",
+      }
+    );
+    if (!ok) return;
+
+    setSavingId(usuario.id);
+    const { error } = await apagarUsuario(usuario.id);
+    if (error) {
+      showToast(error, "error");
+    } else {
+      showToast(`${usuario.name} foi apagado(a).`, "success");
+      setUsuarios((prev) => prev.filter((u) => u.id !== usuario.id));
     }
     setSavingId(null);
   };
@@ -491,6 +521,14 @@ const Usuarios: React.FC = () => {
                   >
                     <X size={15} /> Recusar
                   </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    disabled={savingId === usuario.id}
+                    onClick={() => apagar(usuario)}
+                    title="Apagar usuário permanentemente"
+                  >
+                    <Trash2 size={15} /> Apagar
+                  </button>
                 </div>
               </div>
             ))}
@@ -563,6 +601,17 @@ const Usuarios: React.FC = () => {
                       onClick={() => reativar(usuario)}
                     >
                       <Check size={14} /> Reativar
+                    </button>
+                  )}
+
+                  {!isSelfAdmin && (
+                    <button
+                      className="btn btn-danger btn-sm"
+                      disabled={savingId === usuario.id}
+                      onClick={() => apagar(usuario)}
+                      title="Apagar usuário permanentemente"
+                    >
+                      <Trash2 size={14} /> Apagar
                     </button>
                   )}
                 </div>

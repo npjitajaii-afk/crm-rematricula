@@ -14,13 +14,15 @@
 .lead-form-header h1 {
   font-size: 2rem;
   margin: 0;
+  color: var(--text-primary);
 }
 
 .lead-form-container {
-  background-color: white;
+  background-color: var(--bg-primary);
   border-radius: var(--radius-md);
   padding: 2rem;
   box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
 }
 
 .lead-form {
@@ -75,6 +77,8 @@
   font-size: 0.9375rem;
   font-family: inherit;
   transition: var(--transition);
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .form-group input:focus,
@@ -179,7 +183,7 @@
   padding: 0.4rem 0.9rem;
   border-radius: var(--radius-full, 999px);
   border: 1.5px solid var(--gray-300);
-  background-color: white;
+  background-color: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 0.85rem;
   font-weight: 500;
@@ -199,8 +203,9 @@
 
 /* Aviso de contato já existente no polo (cadastro) */
 .form-duplicado-aviso {
-  background: #fff8e6;
-  border: 1px solid #f0d78c;
+  background: var(--bg-elevated);
+  border: 1px solid var(--gray-300);
+  border-left: 4px solid #f0d78c;
   border-radius: var(--radius-md);
   padding: 1rem 1.25rem;
   color: var(--text-primary);
@@ -240,7 +245,7 @@
   padding: 0.45rem 0.85rem;
   border: 1px solid var(--gray-200, #e5e7eb);
   border-radius: 999px;
-  background: #fff;
+  background: var(--bg-elevated);
   color: var(--text-secondary, #6b7280);
   font-size: 0.85rem;
   cursor: pointer;

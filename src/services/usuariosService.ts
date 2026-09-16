@@ -188,3 +188,26 @@ export async function definirSetorUsuario(
     return { error: 'Erro ao atualizar setor do usuário' };
   }
 }
+
+/**
+ * Apaga um usuário de forma permanente (profile + tentativa de remover
+ * auth.users). Só admin consegue executar — validado no banco pela RPC
+ * `admin_apagar_usuario`. Não permite apagar a si mesmo nem outro admin.
+ */
+export async function apagarUsuario(
+  userId: string
+): Promise<{ error: string | null }> {
+  try {
+    const { error } = await supabase.rpc('admin_apagar_usuario', {
+      target_id: userId,
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    return { error: null };
+  } catch {
+    return { error: 'Erro ao apagar usuário' };
+  }
+}
