@@ -16,7 +16,11 @@ const MinhaArea: React.FC = () => {
 
   const meusAlunos = useMemo(
     () =>
-      isAdmin ? alunos : alunos.filter((a) => a.assignedTo === user?.id),
+      isAdmin
+        ? alunos
+        : alunos.filter(
+            (a) => a.assignedTo === user?.id && a.status !== "engajado"
+          ),
     [alunos, isAdmin, user]
   );
 
@@ -100,8 +104,7 @@ const MinhaArea: React.FC = () => {
         <div className="panel-card">
           <div className="panel-header">
             <h2>
-              <Bell size={18} />
-              Notificações
+              <Bell size={18} /> Notificações
             </h2>
             {naoLidas > 0 && (
               <button className="panel-link" onClick={marcarTodasLidas}>

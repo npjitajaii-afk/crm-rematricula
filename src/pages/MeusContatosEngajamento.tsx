@@ -72,17 +72,22 @@ const MeusContatosEngajamento: React.FC = () => {
   const totalMeus = useMemo(
     () =>
       alunos.filter(
-        (a) => a.area === "engajamento" && a.assignedTo === user?.id
+        (a) =>
+          a.area === "engajamento" &&
+          a.assignedTo === user?.id &&
+          a.status !== "engajado"
       ).length,
     [alunos, user]
   );
 
   // Lista filtrada (só meus contatos + busca local) para o modo "lista".
+  // Status "engajado" oculto do dono; continua na aba Alunos para a hierarquia.
   const meusFiltrados = useMemo(() => {
     const termo = searchTerm.trim().toLowerCase();
     return alunos.filter((a) => {
       if (a.area !== "engajamento") return false;
       if (a.assignedTo !== user?.id) return false;
+      if (a.status === "engajado") return false;
       if (!termo) return true;
       const alvo =
         `${a.name} ${a.email ?? ""} ${a.phone ?? ""} ${a.ra ?? ""} ${a.curso ?? ""}`.toLowerCase();

@@ -95,6 +95,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     for (const aluno of alunos) {
       if (aluno.area !== area) continue;
       if (onlyMine && aluno.assignedTo !== user?.id) continue;
+      // "engajado" oculto em Meus Contatos (onlyMine); permanece no board Alunos
+      if (onlyMine && aluno.status === "engajado") continue;
       if (termo) {
         const alvo = `${aluno.name} ${aluno.email ?? ""} ${aluno.phone ?? ""} ${aluno.ra ?? ""}`.toLowerCase();
         if (!alvo.includes(termo)) continue;
