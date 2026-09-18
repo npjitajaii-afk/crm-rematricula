@@ -14,7 +14,8 @@ export type StatusAprovacao = "pendente" | "aprovado" | "rejeitado";
 // supervisor: vê/exclui/delega contatos e métricas só do próprio polo,
 //   não autoriza usuários. Precisa ter poloId definido.
 // colaborador: só os próprios contatos, dentro do polo.
-export type UserRole = "admin" | "supervisor" | "colaborador";
+// creator = global | admin = só o polo | supervisor | colaborador
+export type UserRole = "creator" | "admin" | "supervisor" | "colaborador";
 
 export interface Polo {
   id: string;
@@ -37,8 +38,7 @@ export interface User {
   avatarUrl?: string | null;
   role: UserRole;
   status: StatusAprovacao;
-  // Áreas que o colaborador pode ver/editar. Ignorado quando role = admin
-  // (admin sempre tem acesso a todas as áreas).
+  // Áreas que o colaborador pode ver/editar. Ignorado quando role = admin ou creator (sempre têm todas as áreas).
   areasPermitidas: Area[];
   /** Polo do colaborador. Admin pode ficar sem polo (vê todos). */
   poloId?: string;
@@ -493,8 +493,9 @@ export interface AlunosContextType {
     fileNamePrefix?: string;
   }) => void | Promise<void>;
   isAdmin: boolean;
+  isCreator: boolean;
   isSupervisor: boolean;
-  /** true para quem pode gerenciar o polo inteiro: admin ou supervisor */
+  /** true para creator, admin ou supervisor (gestão no escopo do papel) */
   canGerenciarPolo: boolean;
   statusResumo: PipelineStatusResumo[];
   colaboradores: {

@@ -137,7 +137,7 @@ function tToPreference(t: number): ThemePref {
 
 const Layout: React.FC = () => {
   const { user, logout } = useAuth();
-  const { isAdmin, canGerenciarPolo, colaboradores } = useAlunos();
+  const { isAdmin, isCreator, canGerenciarPolo, colaboradores } = useAlunos();
   const { totalPendentes, totalAguardandoGestor } = useTransferenciasPendentes();
   const { preference, setPreference } = useTheme();
   const navigate = useNavigate();
@@ -331,11 +331,12 @@ const Layout: React.FC = () => {
 
   const menuItems = allMenuItems
     .filter((item) => {
+      // Polos: creator (estrutura) e admin (setores do próprio polo)
+      if (item.path === "/polos") return !!isAdmin;
+      // Usuários: creator (todos) ou admin (próprio polo — filtro no backend)
+      if (item.path === "/usuarios") return !!isAdmin;
       if (isAdmin) return true;
-      // Usuários e Polos: exclusivamente admin
-      if (item.path === "/usuarios" || item.path === "/polos") return false;
-      // Transferências: só supervisor com funil de engajamento liberado
-      // (colaborador nunca vê, mesmo com engajamento liberado)
+      // Transferências: supervisor com engajamento (ou admin/creator já retornaram)
       if (item.path === "/transferencias") {
         return (
           !!canGerenciarPolo &&
@@ -485,7 +486,9 @@ const Layout: React.FC = () => {
             <div className="rail-user-text">
               <span className="rail-user-name">{user?.name}</span>
               <span className="rail-user-role">
-                {user?.role === "admin"
+                {user?.role === "creator"
+                  ? "Creator"
+                  : user?.role === "admin"
                   ? "Admin"
                   : user?.role === "supervisor"
                   ? "Supervisor"

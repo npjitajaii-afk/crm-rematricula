@@ -2,20 +2,21 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { Area } from "../types";
+import { temAcessoArea } from "../utils/areaAccess";
 
 interface AreaRouteProps {
   area: Area;
   children: React.ReactNode;
 }
 
-// Admin sempre passa. Colaborador só passa se a área estiver liberada em
-// user.areasPermitidas (definido pelo admin na tela de Usuários).
+/**
+ * Creator e admin: acesso a todas as áreas (igual is_admin no banco).
+ * Supervisor/colaborador: só se a área estiver em areasPermitidas.
+ */
 const AreaRoute: React.FC<AreaRouteProps> = ({ area, children }) => {
   const { user } = useAuth();
 
-  const temAcesso = user?.role === "admin" || !!user?.areasPermitidas?.includes(area);
-
-  if (!temAcesso) {
+  if (!temAcessoArea(user, area)) {
     return <Navigate to="/minha-area" replace />;
   }
 

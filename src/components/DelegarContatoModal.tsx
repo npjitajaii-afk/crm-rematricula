@@ -28,13 +28,32 @@ const DelegarContatoModal: React.FC<DelegarContatoModalProps> = ({ aluno, onClos
 
   // Garante que o usuário atual também seja uma opção, inclusive quando a
   // consulta de perfis for limitada pelas permissões do banco.
-  const responsaveis = useMemo(
-    () =>
-      user && !colaboradores.some((item) => item.id === user.id)
-        ? [...colaboradores, { id: user.id, name: user.name, email: user.email }]
-        : colaboradores,
-    [colaboradores, user]
-  );
+  // Supervisor: só pode delegar dentro do próprio setor (Engajamento).
+  const responsaveis = useMemo(() => {
+    let lista = colaboradores;
+    if (
+      user?.role === "supervisor" &&
+      user.setorId &&
+      aluno.area === "engajamento"
+    ) {
+      lista = colaboradores.filter(
+        (c) => c.setorId === user.setorId || c.id === user.id
+      );
+    }
+    if (user && !lista.some((item) => item.id === user.id)) {
+      lista = [
+        ...lista,
+        {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          setorId: user.setorId,
+          setorNome: user.setorNome,
+        },
+      ];
+    }
+    return lista;
+  }, [colaboradores, user, aluno.area]);
 
   const ehEngajamento = aluno.area === "engajamento";
 

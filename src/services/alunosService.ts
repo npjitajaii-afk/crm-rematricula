@@ -65,6 +65,16 @@ function sanitizarCampo(valor: string, limite: number, pegarPrimeiro = false): s
  * Converte dados do banco para o tipo Aluno
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+/**
+ * Colunas base da tabela alunos usadas por mapDatabaseToAluno (sem joins de
+ * polos/setores nem interacoes — não aplicável a um insert().select()).
+ * Se adicionar um campo novo em mapDatabaseToAluno, adicione aqui também.
+ */
+const ALUNO_COLUNAS_BASE =
+  'id, nome, email, telefone, ra, curso, turno, area, status, canal_contato, ' +
+  'valor_pendente, observacoes, tags, responsavel_id, matricula_vinculada_id, ' +
+  'polo_id, setor_id, criado_por, created_at, updated_at, status_atualizado_em';
+
 function mapDatabaseToAluno(data: any): Aluno {
   const poloJoin = data.polos;
   const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;
@@ -527,7 +537,7 @@ export async function createAlunosBulk(
   onProgress?.(0, total);
 
   for (const batch of batches) {
-    const { data, error } = await supabase.from('alunos').insert(batch).select('*');
+    const { data, error } = await supabase.from('alunos').insert(batch).select(ALUNO_COLUNAS_BASE);
 
     if (!error) {
       alunos.push(...(data || []).map(mapDatabaseToAluno));
@@ -543,7 +553,7 @@ export async function createAlunosBulk(
         const { data: rowData, error: rowError } = await supabase
           .from('alunos')
           .insert([row])
-          .select('*')
+          .select(ALUNO_COLUNAS_BASE)
           .single();
 
         if (rowError) {

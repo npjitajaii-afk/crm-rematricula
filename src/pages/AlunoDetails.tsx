@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useAlunos } from "../hooks/useAlunos";
 import { getAlunoById } from "../services/alunosService";
 import { useAuth } from "../hooks/useAuth";
+import { temAcessoArea } from "../utils/areaAccess";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { useChecklist } from "../hooks/useChecklist";
@@ -87,6 +88,15 @@ const AlunoDetails: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // /alunos/:id é compartilhada entre rematrícula/retenção/engajamento e não
+  // passa pelo <AreaRoute area="..."> (que só existe pras rotas fixas de
+  // listagem). A RLS do banco já bloqueia a leitura de alunos fora da área
+  // liberada, mas sem essa checagem aqui a tela tentaria renderizar vazia
+  // ou com erro em vez de redirecionar de forma clara.
+  if (!temAcessoArea(user, aluno.area)) {
+    return <Navigate to="/minha-area" replace />;
   }
 
   const handleAddInteraction = async (e: React.FormEvent) => {

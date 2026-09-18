@@ -25,7 +25,12 @@ function mapRowToUsuario(row: ProfileRow): Usuario {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role === 'admin' || row.role === 'supervisor' ? row.role : 'colaborador',
+    role:
+      row.role === 'creator' ||
+      row.role === 'admin' ||
+      row.role === 'supervisor'
+        ? row.role
+        : 'colaborador',
     status: (row.status as StatusAprovacao) ?? 'pendente',
     areasPermitidas: (row.areas_permitidas ?? []) as Area[],
     poloId: row.polo_id ?? undefined,

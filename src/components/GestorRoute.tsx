@@ -6,13 +6,12 @@ interface GestorRouteProps {
   children: React.ReactNode;
 }
 
-/** Admin ou supervisor — telas de gestão do polo.
- *  Usuários e Polos continuam em AdminRoute. */
+/** Creator, admin ou supervisor — telas de gestão. */
 const GestorRoute: React.FC<GestorRouteProps> = ({ children }) => {
   const { user } = useAuth();
   const role = user?.role;
 
-  if (role !== "admin" && role !== "supervisor") {
+  if (role !== "creator" && role !== "admin" && role !== "supervisor") {
     return <Navigate to="/minha-area" replace />;
   }
 

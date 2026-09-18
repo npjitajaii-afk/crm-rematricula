@@ -7,6 +7,7 @@ import { Area, AlunoStatus, CanalContato } from "../types";
 import { TAGS_SELECIONAVEIS_POR_AREA } from "../utils/tags";
 import { AREA_CONFIG } from "../config/areas";
 import { normalizarRa, normalizarNomeAluno } from "../services/alunosService";
+import { temAcessoArea } from "../utils/areaAccess";
 import { ArrowLeft, Save, ChevronLeft, ChevronRight, UserPlus, Users } from "lucide-react";
 import DelegarContatoModal from "../components/DelegarContatoModal";
 import "./AlunoForm.css";
@@ -117,6 +118,11 @@ const AlunoForm: React.FC = () => {
       navigate(-1);
       return;
     }
+    if (!temAcessoArea(user, existingAluno.area)) {
+      showToast("Você não tem acesso a esta área.", "error");
+      navigate(-1);
+      return;
+    }
     if (
       !canGerenciarPolo &&
       existingAluno.assignedTo &&
@@ -131,7 +137,7 @@ const AlunoForm: React.FC = () => {
       setHasHydrated(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, isLoadingAlunos, existingAluno, hasHydrated, navigate, showToast, canGerenciarPolo, user?.id, id]);
+  }, [isEditing, isLoadingAlunos, existingAluno, hasHydrated, navigate, showToast, canGerenciarPolo, user, id]);
 
   const statuses: { value: AlunoStatus; label: string }[] = areaConfig.statuses.map(
     (status) => ({ value: status, label: areaConfig.getLabel(status) })

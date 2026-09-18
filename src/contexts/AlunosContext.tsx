@@ -76,9 +76,11 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
   const [polos, setPolos] = useState<Polo[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isCreator = user?.role === "creator";
+  /** Creator (global) ou admin (polo) — poderes administrativos. */
+  const isAdmin = isCreator || user?.role === "admin";
   const isSupervisor = user?.role === "supervisor";
-  /** Admin ou supervisor — gestão do polo inteiro (delegar, excluir, ver equipe). */
+  /** Creator, admin ou supervisor — gestão no escopo do papel. */
   const canGerenciarPolo = isAdmin || isSupervisor;
 
   // Áreas já carregadas com sucesso (lazy load por funil).
@@ -110,15 +112,23 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
    */
   const mergeAlunosDaArea = useCallback(
     (area: Aluno["area"], daArea: Aluno[]) => {
+      // Defesa em profundidade: nunca misturar alunos de outro polo no estado,
+      // mesmo se a RLS do banco falhar ou estiver desatualizada.
+      // Creator e admin: dados operacionais só do próprio polo.
+      const poloUsuario = user?.poloId;
+      const daAreaDoPolo = poloUsuario
+        ? daArea.filter((a) => !a.poloId || a.poloId === poloUsuario)
+        : daArea;
+
       setAlunos((prev) => {
         const outros = prev.filter((a) => a.area !== area);
         // Evita duplicar ids caso a mesma área seja mergeada de novo.
         const idsOutros = new Set(outros.map((a) => a.id));
-        const limpos = daArea.filter((a) => !idsOutros.has(a.id));
+        const limpos = daAreaDoPolo.filter((a) => !idsOutros.has(a.id));
         return [...outros, ...limpos];
       });
     },
-    []
+    [user?.poloId]
   );
 
   /**
@@ -282,7 +292,8 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
     return () => {
       cancelado = true;
     };
-  }, [user?.id, isAdmin, mergeAlunosDaArea]);
+  }, [user?.id, isAdmin,
+      isCreator, mergeAlunosDaArea]);
 
   // Navegação entre funis: carrega a área se ainda não estiver no cache.
   useEffect(() => {
@@ -1167,6 +1178,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       importAlunosEngajamento,
       exportAlunos,
       isAdmin,
+      isCreator,
       isSupervisor,
       canGerenciarPolo,
       statusResumo,
@@ -1194,6 +1206,7 @@ export const AlunosProvider: React.FC<AlunosProviderProps> = ({
       importAlunosEngajamento,
       exportAlunos,
       isAdmin,
+      isCreator,
       isSupervisor,
       canGerenciarPolo,
       statusResumo,

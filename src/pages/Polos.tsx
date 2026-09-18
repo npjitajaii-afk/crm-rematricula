@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAlunos } from "../hooks/useAlunos";
+import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
 import { createPolo, updatePolo, deletePolo } from "../services/polosService";
@@ -24,34 +25,26 @@ import "./Polos.css";
 
 type AbaPolos = "polos" | "setores";
 
-/** Polo de Itajaí (setores do Engajamento ficam só nele). */
-function encontrarPoloItajai(
-  polos: { id: string; nome: string }[]
-): { id: string; nome: string } | null {
-  const found = polos.find((p) => {
-    const n = p.nome
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
-    return n.includes("itajai");
-  });
-  return found || null;
-}
-
 const Polos: React.FC = () => {
   const { polos, isLoadingAlunos } = useAlunos();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
 
-  const [aba, setAba] = useState<AbaPolos>("polos");
+  const isCreator = user?.role === "creator";
+  // Setores: sempre do polo do usuário logado (admin e creator)
+  const poloSetoresId = user?.poloId;
+  const poloSetoresNome =
+    polos.find((p) => p.id === poloSetoresId)?.nome || user?.poloNome || "seu polo";
+
+  const [aba, setAba] = useState<AbaPolos>(isCreator ? "polos" : "setores");
   const [lista, setLista] = useState(polos);
   const [novoNome, setNovoNome] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // ---- Setores (Itajaí) ----
-  const poloItajai = useMemo(() => encontrarPoloItajai(lista), [lista]);
+  // ---- Setores (polo do usuário) ----
   const [setoresItajai, setSetoresItajai] = useState<Setor[]>([]);
   const [carregandoSetores, setCarregandoSetores] = useState(false);
   const [novoSetorNome, setNovoSetorNome] = useState("");
@@ -63,19 +56,19 @@ const Polos: React.FC = () => {
   }, [polos]);
 
   const carregarSetores = useCallback(async () => {
-    if (!poloItajai) {
+    if (!poloSetoresId) {
       setSetoresItajai([]);
       return;
     }
     setCarregandoSetores(true);
-    const { setores, error } = await getSetoresDoPolo(poloItajai.id);
+    const { setores, error } = await getSetoresDoPolo(poloSetoresId);
     setCarregandoSetores(false);
     if (error) {
       showToast(error, "error");
       return;
     }
     setSetoresItajai(setores.filter((s) => s.nome !== "Geral" && s.nome !== "Pendente"));
-  }, [poloItajai, showToast]);
+  }, [poloSetoresId, showToast]);
 
   useEffect(() => {
     if (aba === "setores") {
@@ -159,10 +152,10 @@ const Polos: React.FC = () => {
   // ---- CRUD setores Itajaí ----
   const criarSetor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!poloItajai || !novoSetorNome.trim()) return;
+    if (!poloSetoresId || !novoSetorNome.trim()) return;
 
     setSaving(true);
-    const { setor, error } = await createSetor(novoSetorNome, poloItajai.id);
+    const { setor, error } = await createSetor(novoSetorNome, poloSetoresId);
     setSaving(false);
 
     if (error) {
@@ -233,31 +226,35 @@ const Polos: React.FC = () => {
         <div>
           <h1>Polos</h1>
           <p className="polos-subtitle">
-            Cadastre unidades e setores de Engajamento (Itajaí)
+            {isCreator
+              ? "Cadastre polos e gerencie setores de Engajamento do seu polo"
+              : "Gerencie setores de Engajamento do seu polo"}
           </p>
         </div>
       </div>
 
       <nav className="polos-tabs" aria-label="Seções de polos">
-        <button
-          type="button"
-          className={`polos-tab${aba === "polos" ? " active" : ""}`}
-          onClick={() => setAba("polos")}
-        >
-          <MapPin size={15} />
-          Polos
-        </button>
+        {isCreator && (
+          <button
+            type="button"
+            className={`polos-tab${aba === "polos" ? " active" : ""}`}
+            onClick={() => setAba("polos")}
+          >
+            <MapPin size={15} />
+            Polos
+          </button>
+        )}
         <button
           type="button"
           className={`polos-tab${aba === "setores" ? " active" : ""}`}
           onClick={() => setAba("setores")}
         >
           <Layers size={15} />
-          Setores · Itajaí
+          Setores · {poloSetoresNome}
         </button>
       </nav>
 
-      {aba === "polos" && (
+      {isCreator && aba === "polos" && (
         <>
           <form className="polos-novo" onSubmit={criar}>
             <MapPin size={18} />
@@ -345,16 +342,16 @@ const Polos: React.FC = () => {
 
       {aba === "setores" && (
         <>
-          {!poloItajai ? (
+          {!poloSetoresId ? (
             <p className="polos-empty">
-              Polo de Itajaí não encontrado. Cadastre um polo com &quot;Itajaí&quot;
-              no nome na aba Polos para gerenciar setores.
+              Seu usuário não tem polo definido. Peça ao creator para vincular
+              um polo ao seu perfil antes de gerenciar setores.
             </p>
           ) : (
             <>
               <p className="polos-setores-hint">
-                Setores do Engajamento do polo <strong>{poloItajai.nome}</strong>.
-                Só administradores podem criar, editar ou excluir.
+                Setores do Engajamento do polo <strong>{poloSetoresNome}</strong>.
+                Admin e creator só gerenciam setores do próprio polo.
               </p>
 
               <form className="polos-novo" onSubmit={criarSetor}>

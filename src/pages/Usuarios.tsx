@@ -12,6 +12,7 @@ import { Usuario, Area, UserRole } from "../types";
 import { AREA_CONFIG } from "../config/areas";
 import { useToast } from "../hooks/useToast";
 import { useConfirm } from "../hooks/useConfirm";
+import { useAuth } from "../hooks/useAuth";
 import { useAlunos } from "../hooks/useAlunos";
 import {
   UserCog,
@@ -30,15 +31,14 @@ import "./Usuarios.css";
 
 const TODAS_AREAS: Area[] = ["rematricula", "retencao", "engajamento"];
 
-/** Regra de negócio confirmada: colaborador tem no máximo 2 áreas liberadas
- * simultaneamente (nem todos têm acesso a duas — pode ser só 1). Ver
- * README.md, Bloco C. */
-const MAX_AREAS_POR_COLABORADOR = 2;
+/** Colaborador pode ter até 3 áreas liberadas (todas: rematrícula, retenção, engajamento). */
+const MAX_AREAS_POR_COLABORADOR = 3; // todas as áreas (rematrícula, retenção, engajamento)
 
-/** Role "admin" não aparece no seletor — só existe um admin (já vinculado
- * a um polo) e promover alguém a admin é uma decisão manual (SQL), fora
- * desta tela. Aqui o admin só alterna entre supervisor e colaborador. */
+/** Creator = acesso global. Admin = mesmo poder só no polo.
+ * Na tela: creator pode promover a admin/supervisor/colaborador.
+ * Admin de polo só alterna supervisor/colaborador. */
 const ROLE_LABELS: Record<UserRole, string> = {
+  creator: "Creator",
   admin: "Administrador",
   supervisor: "Supervisor",
   colaborador: "Colaborador",
@@ -52,6 +52,7 @@ const STATUS_INFO: Record<Usuario["status"], { label: string; className: string 
 
 const Usuarios: React.FC = () => {
   const { showToast } = useToast();
+  const { user: me } = useAuth();
   const { confirm } = useConfirm();
   const { polos, setores } = useAlunos();
 
@@ -143,17 +144,14 @@ const Usuarios: React.FC = () => {
 
   const aprovar = async (usuario: Usuario) => {
     setSavingId(usuario.id);
-    // Antes concedia as 3 áreas de cara ("admin ajusta depois"). Como
-    // ninguém pode ter mais de 2 áreas simultâneas, aprovar já com 3 seria
-    // conceder acesso inválido por alguns instantes até o admin corrigir.
-    // Agora aprova sem nenhuma área marcada — o admin escolhe explicitamente
-    // até 2 nos checkboxes logo abaixo.
+    // Aprova sem nenhuma área marcada — o admin escolhe explicitamente
+    // nos checkboxes logo abaixo (pode liberar as 3).
     const { error } = await definirStatusUsuario(usuario.id, "aprovado", []);
     if (error) {
       showToast(error, "error");
     } else {
       showToast(
-        `${usuario.name} aprovado(a). Marque até ${MAX_AREAS_POR_COLABORADOR} áreas de acesso abaixo.`,
+        `${usuario.name} aprovado(a). Marque as áreas de acesso abaixo (pode liberar as 3).`,
         "success"
       );
       setUsuarios((prev) =>
@@ -201,10 +199,8 @@ const Usuarios: React.FC = () => {
 
   const reativar = async (usuario: Usuario) => {
     setSavingId(usuario.id);
-    // Antes caía pra TODAS_AREAS se o colaborador não tivesse nenhuma área
-    // salva — violaria o limite de 2. Mantém o que ele já tinha (respeita
-    // o limite, pois nunca deveria ter passado de 2) ou reativa sem
-    // nenhuma área marcada, deixando o admin escolher.
+    // Mantém as áreas que ele já tinha ou reativa sem nenhuma área
+    // marcada, deixando o admin escolher.
     const areas = usuario.areasPermitidas.slice(0, MAX_AREAS_POR_COLABORADOR);
     const { error } = await definirStatusUsuario(usuario.id, "aprovado", areas);
     if (error) {
@@ -249,7 +245,7 @@ const Usuarios: React.FC = () => {
 
     if (!jaTem && usuario.areasPermitidas.length >= MAX_AREAS_POR_COLABORADOR) {
       showToast(
-        `Cada colaborador pode ter no máximo ${MAX_AREAS_POR_COLABORADOR} áreas liberadas ao mesmo tempo. Desmarque uma antes de marcar outra.`,
+        `Todas as áreas já estão liberadas para este usuário.`,
         "error"
       );
       return;
@@ -342,16 +338,33 @@ const Usuarios: React.FC = () => {
   };
 
   const alterarRole = async (usuario: Usuario, novoRole: UserRole) => {
-    if (novoRole === "supervisor" && !usuario.poloId) {
-      showToast("Defina o polo do usuário antes de torná-lo supervisor.", "error");
+    if ((novoRole === "supervisor" || novoRole === "admin") && !usuario.poloId) {
+      showToast("Defina o polo do usuário antes de torná-lo " + ROLE_LABELS[novoRole] + ".", "error");
+      return;
+    }
+    if (novoRole === "creator") {
+      showToast("O papel Creator só pode ser definido manualmente no banco.", "error");
       return;
     }
 
     const roleAnterior = usuario.role;
     const setorAnterior = usuario.setorId;
     const setorNomeAnterior = usuario.setorNome;
-    // Admin/supervisor não usam setor (regra do banco limpa no trigger).
-    const limparSetor = novoRole === "admin" || novoRole === "supervisor";
+    // Só admin não usa setor. Supervisor passa a ser vinculado a um setor.
+    const limparSetor = novoRole === "creator";
+
+    // Ao promover a supervisor com área engajamento, exige setor já definido
+    if (
+      novoRole === "supervisor" &&
+      usuario.areasPermitidas.includes("engajamento") &&
+      !usuario.setorId
+    ) {
+      showToast(
+        "Defina o setor do usuário antes de torná-lo supervisor de Engajamento.",
+        "error"
+      );
+      return;
+    }
 
     setUsuarios((prev) =>
       prev.map((u) =>
@@ -389,9 +402,9 @@ const Usuarios: React.FC = () => {
     const novoSetorId = setorId || null;
     const temEngajamento = usuario.areasPermitidas.includes("engajamento");
 
-    if (!novoSetorId && temEngajamento) {
+    if (!novoSetorId && (temEngajamento || usuario.role === "supervisor")) {
       showToast(
-        "Colaborador com área Engajamento precisa de um setor. Remova a área antes de limpar o setor.",
+        "Supervisor e colaborador com área Engajamento precisam de um setor. Remova a área (ou rebaixe o papel) antes de limpar o setor.",
         "error"
       );
       return;
@@ -562,7 +575,21 @@ const Usuarios: React.FC = () => {
                 <div className="usuarios-list">
                   {grupo.usuarios.map((usuario) => {
             const statusInfo = STATUS_INFO[usuario.status];
-            const isSelfAdmin = usuario.role === "admin";
+            // Creator pode editar admin (controle). Admin NÃO edita outro admin nem creator.
+            // Ninguém edita a si mesmo por esta tela (evita auto-rebaixar).
+            const euSouCreator = me?.role === "creator";
+            const euSouAdmin = me?.role === "admin";
+            const isProtected =
+              usuario.id === me?.id ||
+              usuario.role === "creator" ||
+              (euSouAdmin && usuario.role === "admin");
+
+            const badgeLabel =
+              usuario.role === "creator"
+                ? "Creator"
+                : usuario.role === "admin"
+                ? "Admin"
+                : null;
 
             return (
               <div key={usuario.id} className="usuario-card">
@@ -571,9 +598,9 @@ const Usuarios: React.FC = () => {
                   <div>
                     <p className="usuario-name">
                       {usuario.name}
-                      {isSelfAdmin && (
+                      {badgeLabel && (
                         <span className="usuario-admin-badge">
-                          <ShieldCheck size={12} /> Admin
+                          <ShieldCheck size={12} /> {badgeLabel}
                         </span>
                       )}
                     </p>
@@ -584,7 +611,7 @@ const Usuarios: React.FC = () => {
                 <div className="usuario-status-col">
                   <span className={`status-chip ${statusInfo.className}`}>{statusInfo.label}</span>
 
-                  {!isSelfAdmin && usuario.status === "aprovado" && (
+                  {!isProtected && usuario.status === "aprovado" && (
                     <button
                       className="btn btn-secondary btn-sm"
                       disabled={savingId === usuario.id}
@@ -594,7 +621,7 @@ const Usuarios: React.FC = () => {
                     </button>
                   )}
 
-                  {!isSelfAdmin && usuario.status === "rejeitado" && (
+                  {!isProtected && usuario.status === "rejeitado" && (
                     <button
                       className="btn btn-secondary btn-sm"
                       disabled={savingId === usuario.id}
@@ -604,7 +631,7 @@ const Usuarios: React.FC = () => {
                     </button>
                   )}
 
-                  {!isSelfAdmin && (
+                  {!isProtected && (
                     <button
                       className="btn btn-danger btn-sm"
                       disabled={savingId === usuario.id}
@@ -616,7 +643,7 @@ const Usuarios: React.FC = () => {
                   )}
                 </div>
 
-                {!isSelfAdmin ? (
+                {!isProtected ? (
                   <>
                     <div className="usuario-polo">
                       <label htmlFor={`role-${usuario.id}`}>Nível de acesso</label>
@@ -628,6 +655,7 @@ const Usuarios: React.FC = () => {
                       >
                         <option value="colaborador">{ROLE_LABELS.colaborador}</option>
                         <option value="supervisor">{ROLE_LABELS.supervisor}</option>
+                        <option value="admin">{ROLE_LABELS.admin}</option>
                       </select>
                       {usuario.role === "supervisor" && !usuario.poloId && (
                         <p className="usuario-role-aviso">
@@ -673,11 +701,12 @@ const Usuarios: React.FC = () => {
                         ))}
                       </select>
                     </div>
-                    {usuario.role === "colaborador" && (
+                    {(usuario.role === "colaborador" || usuario.role === "supervisor") && (
                       <div className="usuario-polo">
                         <label htmlFor={`setor-${usuario.id}`}>
                           Setor (Engajamento)
-                          {usuario.areasPermitidas.includes("engajamento") && (
+                          {(usuario.areasPermitidas.includes("engajamento") ||
+                            usuario.role === "supervisor") && (
                             <span className="required"> *</span>
                           )}
                         </label>
@@ -700,18 +729,26 @@ const Usuarios: React.FC = () => {
                               </option>
                             ))}
                         </select>
-                        {usuario.areasPermitidas.includes("engajamento") &&
+                        {(usuario.areasPermitidas.includes("engajamento") ||
+                          usuario.role === "supervisor") &&
                           !usuario.setorId && (
                           <p className="usuario-polo-aviso">
-                            Obrigatório para área Engajamento — defina o setor
-                            antes de liberar a área.
+                            Obrigatório para supervisor e para área Engajamento —
+                            o supervisor só gerencia contatos e aprova transferências
+                            do seu próprio setor.
                           </p>
                         )}
                       </div>
                     )}
                   </>
                 ) : (
-                  <p className="usuario-areas-admin-note">Acesso total (admin)</p>
+                  <p className="usuario-areas-admin-note">
+                    {usuario.role === "creator"
+                      ? "Acesso global (creator) — não editável por admin"
+                      : usuario.id === me?.id
+                      ? "Este é o seu usuário — edite outros perfis, não o seu"
+                      : "Administrador do polo — não editável por outro admin"}
+                  </p>
                 )}
               </div>
             );

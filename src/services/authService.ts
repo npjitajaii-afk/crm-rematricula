@@ -29,7 +29,12 @@ function mapProfileToUser(profile: {
     name: profile.name,
     email: profile.email,
     avatarUrl: profile.avatar_url,
-    role: profile.role === "admin" || profile.role === "supervisor" ? profile.role : "colaborador",
+    role:
+      profile.role === "creator" ||
+      profile.role === "admin" ||
+      profile.role === "supervisor"
+        ? profile.role
+        : "colaborador",
     status: profile.status === "aprovado" || profile.status === "rejeitado" ? profile.status : "pendente",
     areasPermitidas: (profile.areas_permitidas ?? []) as User["areasPermitidas"],
     poloId: profile.polo_id ?? undefined,

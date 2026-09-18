@@ -6,10 +6,12 @@ interface AdminRouteProps {
   children: React.ReactNode;
 }
 
+/** Creator (global) ou admin (polo) — telas de gestão administrativa. */
 const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   const { user } = useAuth();
+  const role = user?.role;
 
-  if (user?.role !== "admin") {
+  if (role !== "creator" && role !== "admin") {
     return <Navigate to="/minha-area" replace />;
   }
 

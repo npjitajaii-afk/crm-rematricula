@@ -18,7 +18,10 @@ const mapTarefa = (row: any): TarefaPessoal => ({
   checklist: (row.checklist || []).map(mapChecklist).sort((a: TarefaChecklistItem, b: TarefaChecklistItem) => a.ordem - b.ordem),
   createdAt: new Date(row.created_at), updatedAt: new Date(row.updated_at),
 });
-const select = (area: TarefasArea) => `*, user_profile:user_id ( name ), aluno:aluno_id ( nome ), checklist:${tables(area).checklist} ( * )`;
+const select = (area: TarefasArea) =>
+  `id, user_id, titulo, anotacoes, aluno_id, prazo, status, created_at, updated_at, ` +
+  `user_profile:user_id ( name ), aluno:aluno_id ( nome ), ` +
+  `checklist:${tables(area).checklist} ( id, tarefa_id, texto, concluido, ordem )`;
 
 export async function getTarefasPessoais(area: TarefasArea = "engajamento") {
   const { data, error } = await supabase.from(tables(area).tarefas).select(select(area)).order("updated_at", { ascending: false });
@@ -56,7 +59,7 @@ export async function toggleTarefaChecklistItem(itemId: string, concluido: boole
   return { error: error?.message ?? null };
 }
 export async function adicionarTarefaChecklistItem(tarefaId: string, texto: string, ordem: number, area: TarefasArea = "engajamento") {
-  const { data, error } = await supabase.from(tables(area).checklist).insert({ tarefa_id: tarefaId, texto: texto.trim(), ordem }).select("*").single();
+  const { data, error } = await supabase.from(tables(area).checklist).insert({ tarefa_id: tarefaId, texto: texto.trim(), ordem }).select("id, tarefa_id, texto, concluido, ordem").single();
   return { item: data ? mapChecklist(data) : null, error: error?.message ?? null };
 }
 export async function removerTarefaChecklistItem(itemId: string, area: TarefasArea = "engajamento") {

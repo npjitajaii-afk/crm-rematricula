@@ -39,7 +39,7 @@ export async function getResumoWhatsappTodosAlunos(): Promise<{
   try {
     const { data, error } = await supabase
       .from("whatsapp_resumo_por_aluno")
-      .select("*");
+      .select("aluno_id, nao_lidas, ultima_mensagem, ultima_direcao, ultima_mensagem_em");
 
     if (error) {
       console.error("Erro ao buscar resumo de whatsapp:", error);
@@ -65,7 +65,7 @@ export async function getResumoWhatsappPorAluno(
   try {
     const { data, error } = await supabase
       .from("whatsapp_resumo_por_aluno")
-      .select("*")
+      .select("aluno_id, nao_lidas, ultima_mensagem, ultima_direcao, ultima_mensagem_em")
       .eq("aluno_id", alunoId)
       .maybeSingle();
 
@@ -86,7 +86,7 @@ export async function getMensagensPorAluno(
   try {
     const { data, error } = await supabase
       .from("whatsapp_mensagens")
-      .select("*")
+      .select("id, aluno_id, telefone, direcao, tipo_mensagem, mensagem, lida, created_at")
       .eq("aluno_id", alunoId)
       .order("created_at", { ascending: true });
 
