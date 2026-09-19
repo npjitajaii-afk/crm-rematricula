@@ -15,7 +15,6 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import PrivateRoute from "./components/PrivateRoute";
 import AreaRoute from "./components/AreaRoute";
 import AdminRoute from "./components/AdminRoute";
-import CreatorRoute from "./components/CreatorRoute";
 import GestorRoute from "./components/GestorRoute";
 import IndexRedirect from "./components/IndexRedirect";
 import Layout from "./components/Layout";

@@ -64,7 +64,6 @@ function sanitizarCampo(valor: string, limite: number, pegarPrimeiro = false): s
 /**
  * Converte dados do banco para o tipo Aluno
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 /**
  * Colunas base da tabela alunos usadas por mapDatabaseToAluno (sem joins de
  * polos/setores nem interacoes — não aplicável a um insert().select()).
@@ -75,6 +74,7 @@ const ALUNO_COLUNAS_BASE =
   'valor_pendente, observacoes, tags, responsavel_id, matricula_vinculada_id, ' +
   'polo_id, setor_id, criado_por, created_at, updated_at, status_atualizado_em';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapDatabaseToAluno(data: any): Aluno {
   const poloJoin = data.polos;
   const poloNome = Array.isArray(poloJoin) ? poloJoin[0]?.nome : poloJoin?.nome;

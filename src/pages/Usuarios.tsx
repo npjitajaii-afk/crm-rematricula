@@ -351,7 +351,7 @@ const Usuarios: React.FC = () => {
     const setorAnterior = usuario.setorId;
     const setorNomeAnterior = usuario.setorNome;
     // Só admin não usa setor. Supervisor passa a ser vinculado a um setor.
-    const limparSetor = novoRole === "creator";
+    const limparSetor = novoRole === "admin";
 
     // Ao promover a supervisor com área engajamento, exige setor já definido
     if (
@@ -577,7 +577,6 @@ const Usuarios: React.FC = () => {
             const statusInfo = STATUS_INFO[usuario.status];
             // Creator pode editar admin (controle). Admin NÃO edita outro admin nem creator.
             // Ninguém edita a si mesmo por esta tela (evita auto-rebaixar).
-            const euSouCreator = me?.role === "creator";
             const euSouAdmin = me?.role === "admin";
             const isProtected =
               usuario.id === me?.id ||

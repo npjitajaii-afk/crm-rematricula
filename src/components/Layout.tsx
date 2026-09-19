@@ -137,7 +137,7 @@ function tToPreference(t: number): ThemePref {
 
 const Layout: React.FC = () => {
   const { user, logout } = useAuth();
-  const { isAdmin, isCreator, canGerenciarPolo, colaboradores } = useAlunos();
+  const { isAdmin, canGerenciarPolo, colaboradores } = useAlunos();
   const { totalPendentes, totalAguardandoGestor } = useTransferenciasPendentes();
   const { preference, setPreference } = useTheme();
   const navigate = useNavigate();

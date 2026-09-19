@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useAlunos } from "../hooks/useAlunos";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
