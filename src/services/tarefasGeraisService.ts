@@ -450,8 +450,15 @@ export async function adicionarComentario(
 ): Promise<{ error: string | null }> {
   const t = texto.trim();
   if (!t) return { error: "Comentário vazio." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada. Faça login novamente." };
+
   const { error } = await supabase.from(tabelaComentarios(area)).insert({
     tarefa_id: tarefaId,
+    user_id: user.id,
     texto: t,
   });
   return { error: error?.message ?? null };
